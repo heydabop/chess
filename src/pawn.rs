@@ -25,6 +25,9 @@ impl Piece for Pawn {
     }
 
     fn draw(&self) -> char {
-        'P'
+        match self.color {
+            Color::Black => '\u{265F}',
+            Color::White => '\u{2659}',
+        }
     }
 }

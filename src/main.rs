@@ -11,7 +11,7 @@ mod space;
 use board::Board;
 use crossterm::{
     cursor,
-    event::read,
+    event::{read, Event, KeyCode},
     execute, queue,
     style::{self, Stylize},
     terminal, Result,
@@ -31,11 +31,31 @@ fn main() -> Result<()> {
             queue!(
                 stdout,
                 cursor::MoveTo(x.into(), y.into()),
-                style::PrintStyledContent(spaces[y as usize][x as usize].draw().magenta())
+                style::PrintStyledContent(spaces[y as usize][x as usize].draw().green())
             )?;
         }
     }
+    queue!(
+        stdout,
+        cursor::SetCursorShape(cursor::CursorShape::Block),
+        cursor::EnableBlinking,
+        cursor::Show,
+    )?;
     stdout.flush()?;
-    read()?;
+    terminal::enable_raw_mode()?;
+    loop {
+        let e = read()?;
+        if let Event::Key(k) = e {
+            match k.code {
+                KeyCode::Up => execute!(stdout, cursor::MoveUp(1)),
+                KeyCode::Down => execute!(stdout, cursor::MoveDown(1)),
+                KeyCode::Left => execute!(stdout, cursor::MoveLeft(1)),
+                KeyCode::Right => execute!(stdout, cursor::MoveRight(1)),
+                KeyCode::Char('q') => break,
+                _ => Ok(()),
+            }?;
+        }
+    }
+    terminal::disable_raw_mode()?;
     Ok(())
 }
