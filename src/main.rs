@@ -63,11 +63,9 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn game_loop(board: Board) -> Result<()> {
+fn game_loop(mut board: Board) -> Result<()> {
     let mut stdout = stdout();
 
-    let mut turn_color = Color::White;
-    let spaces = board.spaces();
     loop {
         let e = read()?;
         if let Event::Key(k) = e {
@@ -82,18 +80,15 @@ fn game_loop(board: Board) -> Result<()> {
                     let x = pos.0 as usize;
                     let y = pos.1 as usize;
                     if x < 8 && y < 8 {
-                        let space = &spaces[7 - y][x];
+                        let space = &board.spaces()[7 - y][x];
                         if let Some(piece_color) = space.piece_color() {
-                            if piece_color == turn_color {
+                            if piece_color == board.turn_color() {
                                 execute!(
                                     stdout,
                                     style::PrintStyledContent(space.draw().black().on_green()),
                                     cursor::MoveLeft(1)
                                 )?;
-                                turn_color = match turn_color {
-                                    Color::White => Color::Black,
-                                    Color::Black => Color::White,
-                                };
+                                board.next_turn();
                             }
                         }
                     }
