@@ -33,6 +33,10 @@ impl Board {
         }
     }
 
+    pub fn space(&self, x: u8, y: u8) -> &Space {
+        &self.spaces[y as usize][x as usize]
+    }
+
     pub fn spaces(&self) -> &[[Space; 8]; 8] {
         &self.spaces
     }
@@ -46,6 +50,24 @@ impl Board {
             Color::White => Color::Black,
             Color::Black => Color::White,
         };
+    }
+
+    pub fn move_piece(&mut self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
+        let piece = self.space(x1, y1).piece();
+        if let Some(piece) = &piece {
+            let piece2 = self.space(x2, y2).piece();
+            if !piece.can_move(x1, y1, x2, y2, piece2) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        let mut piece = self.spaces[y1 as usize][x1 as usize]
+            .remove_piece()
+            .unwrap();
+        piece.mark_moved();
+        self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
+        true
     }
 }
 

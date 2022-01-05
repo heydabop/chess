@@ -30,4 +30,12 @@ impl Space {
     pub fn color(&self) -> Color {
         self.color
     }
+
+    pub fn remove_piece(&mut self) -> Option<Box<dyn Piece>> {
+        self.piece.take()
+    }
+
+    pub fn set_piece(&mut self, piece: Option<Box<dyn Piece>>) {
+        self.piece = piece;
+    }
 }
