@@ -54,57 +54,52 @@ fn main() -> Result<()> {
     )?;
     stdout.flush()?;
     terminal::enable_raw_mode()?;
-    let turn_color = Color::White;
-    let last = loop {
-        match read() {
-            Ok(e) => {
-                if let Event::Key(k) = e {
-                    if let Err(ke) = match k.code {
-                        KeyCode::Up => execute!(stdout, cursor::MoveUp(1)),
-                        KeyCode::Down => execute!(stdout, cursor::MoveDown(1)),
-                        KeyCode::Left => execute!(stdout, cursor::MoveLeft(1)),
-                        KeyCode::Right => execute!(stdout, cursor::MoveRight(1)),
-                        KeyCode::Char('q') => break Ok(()),
-                        KeyCode::Char(' ') => {
-                            let pos = match cursor::position() {
-                                Ok(p) => p,
-                                Err(e) => break Err(e),
-                            };
-                            let x = pos.0 as usize;
-                            let y = pos.1 as usize;
-                            if x < 8 && y < 8 {
-                                let space = &spaces[7 - y][x];
-                                if let Some(piece_color) = space.piece_color() {
-                                    if piece_color == turn_color {
-                                        execute!(
-                                            stdout,
-                                            style::PrintStyledContent(
-                                                space.draw().black().on_green()
-                                            ),
-                                            cursor::MoveLeft(1)
-                                        )
-                                    } else {
-                                        Ok(())
-                                    }
-                                } else {
-                                    Ok(())
-                                }
-                            } else {
-                                Ok(())
-                            }
-                        }
-                        _ => Ok(()),
-                    } {
-                        break Err(ke);
-                    }
-                }
-            }
-            Err(e) => break Err(e),
-        };
-    };
-    // If last is an err these commands are probably also going to fail...
+
+    game_loop(board)?;
+
     terminal::disable_raw_mode()?;
     execute!(stdout, cursor::MoveTo(0, 0))?;
 
-    last
+    Ok(())
+}
+
+fn game_loop(board: Board) -> Result<()> {
+    let mut stdout = stdout();
+
+    let mut turn_color = Color::White;
+    let spaces = board.spaces();
+    loop {
+        let e = read()?;
+        if let Event::Key(k) = e {
+            match k.code {
+                KeyCode::Up => execute!(stdout, cursor::MoveUp(1))?,
+                KeyCode::Down => execute!(stdout, cursor::MoveDown(1))?,
+                KeyCode::Left => execute!(stdout, cursor::MoveLeft(1))?,
+                KeyCode::Right => execute!(stdout, cursor::MoveRight(1))?,
+                KeyCode::Char('q') => return Ok(()),
+                KeyCode::Char(' ') => {
+                    let pos = cursor::position()?;
+                    let x = pos.0 as usize;
+                    let y = pos.1 as usize;
+                    if x < 8 && y < 8 {
+                        let space = &spaces[7 - y][x];
+                        if let Some(piece_color) = space.piece_color() {
+                            if piece_color == turn_color {
+                                execute!(
+                                    stdout,
+                                    style::PrintStyledContent(space.draw().black().on_green()),
+                                    cursor::MoveLeft(1)
+                                )?;
+                                turn_color = match turn_color {
+                                    Color::White => Color::Black,
+                                    Color::Black => Color::White,
+                                };
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
 }
