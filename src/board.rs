@@ -13,7 +13,7 @@ impl Board {
         Self {
             spaces: from_fn(|row| {
                 from_fn(|col| {
-                    let color = if row + col % 2 == 0 {
+                    let color = if (row + col) % 2 == 0 {
                         Color::Black
                     } else {
                         Color::White

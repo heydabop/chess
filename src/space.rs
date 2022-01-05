@@ -19,7 +19,15 @@ impl Space {
         }
     }
 
+    pub fn piece(&self) -> &Option<Box<dyn Piece>> {
+        &self.piece
+    }
+
     pub fn piece_color(&self) -> Option<Color> {
         self.piece.as_ref().map(|p| p.color())
+    }
+
+    pub fn color(&self) -> Color {
+        self.color
     }
 }
