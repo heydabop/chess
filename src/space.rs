@@ -18,4 +18,8 @@ impl Space {
             '_'
         }
     }
+
+    pub fn piece_color(&self) -> Option<Color> {
+        self.piece.as_ref().map(|p| p.color())
+    }
 }

@@ -9,6 +9,7 @@ mod piece;
 mod space;
 
 use board::Board;
+use color::Color;
 use crossterm::{
     cursor,
     event::{read, Event, KeyCode},
