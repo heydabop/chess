@@ -1,7 +1,6 @@
 use crate::color::Color;
 use crate::move_record::MoveRecord;
-use crate::pawn::Pawn;
-use crate::piece::{Piece, PieceType};
+use crate::piece::{Bishop, King, Knight, Pawn, Piece, PieceType, Queen, Rook};
 use crate::space::Space;
 use std::array::from_fn;
 
@@ -21,12 +20,27 @@ impl Board {
                     } else {
                         Color::White
                     };
-                    let piece: Option<Box<dyn Piece>> = if row == 1 {
-                        Some(Box::new(Pawn::new(Color::White)))
-                    } else if row == 6 {
-                        Some(Box::new(Pawn::new(Color::Black)))
-                    } else {
-                        None
+                    let piece: Option<Box<dyn Piece>> = match row {
+                        0 => match col {
+                            0 | 7 => Some(Box::new(Rook::new(Color::White))),
+                            1 | 6 => Some(Box::new(Knight::new(Color::White))),
+                            2 | 5 => Some(Box::new(Bishop::new(Color::White))),
+                            3 => Some(Box::new(Queen::new(Color::White))),
+                            4 => Some(Box::new(King::new(Color::White))),
+                            _ => panic!("Board generation column out of bounds"),
+                        },
+                        1 => Some(Box::new(Pawn::new(Color::White))),
+                        2..=5 => None,
+                        6 => Some(Box::new(Pawn::new(Color::Black))),
+                        7 => match col {
+                            0 | 7 => Some(Box::new(Rook::new(Color::Black))),
+                            1 | 6 => Some(Box::new(Knight::new(Color::Black))),
+                            2 | 5 => Some(Box::new(Bishop::new(Color::Black))),
+                            3 => Some(Box::new(Queen::new(Color::Black))),
+                            4 => Some(Box::new(King::new(Color::Black))),
+                            _ => panic!("Board generation column out of bounds"),
+                        },
+                        _ => panic!("Board generation row out of bounds"),
                     };
                     Space::new(color, piece)
                 })

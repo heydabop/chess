@@ -1,11 +1,11 @@
 #![feature(array_from_fn)]
 #![allow(dead_code)]
 #![warn(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions)]
 
 mod board;
 mod color;
 mod move_record;
-mod pawn;
 mod piece;
 mod space;
 
