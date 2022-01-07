@@ -4,6 +4,7 @@
 
 mod board;
 mod color;
+mod move_record;
 mod pawn;
 mod piece;
 mod space;
@@ -25,19 +26,8 @@ fn main() -> Result<()> {
 
     let mut stdout = stdout();
 
-    execute!(stdout, terminal::Clear(terminal::ClearType::All))?;
-
-    for y in 0u8..8u8 {
-        for x in 0u8..8u8 {
-            let space = board.space(x, 7 - y);
-            let colors = get_term_colors(space);
-            queue!(
-                stdout,
-                cursor::MoveTo(x.into(), y.into()),
-                style::PrintStyledContent(space.draw().with(colors.0).on(colors.1))
-            )?;
-        }
-    }
+    queue!(stdout, terminal::Clear(terminal::ClearType::All))?;
+    queue_board(&board)?;
     queue!(
         stdout,
         cursor::SetCursorShape(cursor::CursorShape::Block),
@@ -91,25 +81,9 @@ fn game_loop(mut board: Board) -> Result<()> {
                             selected = None;
                             board.next_turn();
 
-                            let origin_space = board.space(s.0, s.1);
-                            let origin_colors = get_term_colors(origin_space);
-                            let dest_space = board.space(x, y);
-                            let dest_colors = get_term_colors(dest_space);
-                            execute!(
-                                stdout,
-                                cursor::MoveTo(s.0.into(), (7 - s.1).into()),
-                                style::PrintStyledContent(
-                                    origin_space
-                                        .draw()
-                                        .with(origin_colors.0)
-                                        .on(origin_colors.1)
-                                ),
-                                cursor::MoveTo(x.into(), (7 - y).into()),
-                                style::PrintStyledContent(
-                                    dest_space.draw().with(dest_colors.0).on(dest_colors.1)
-                                ),
-                                cursor::MoveLeft(1)
-                            )?;
+                            queue_board(&board)?;
+                            queue!(stdout, cursor::MoveTo(x.into(), (7 - y).into()))?;
+                            stdout.flush()?;
                         }
                     } else if x < 8 && y < 8 {
                         let space = board.space(x, y);
@@ -145,4 +119,21 @@ fn get_term_colors(space: &Space) -> (TermColor, TermColor) {
         Color::Black => TermColor::Black,
     };
     (piece_color, space_color)
+}
+
+fn queue_board(board: &Board) -> Result<()> {
+    let mut stdout = stdout();
+    for y in 0u8..8u8 {
+        for x in 0u8..8u8 {
+            let space = board.space(x, 7 - y);
+            let colors = get_term_colors(space);
+            queue!(
+                stdout,
+                cursor::MoveTo(x.into(), y.into()),
+                style::PrintStyledContent(space.draw().with(colors.0).on(colors.1))
+            )?;
+        }
+    }
+
+    Ok(())
 }

@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::piece::Piece;
+use crate::piece::{Piece, PieceType};
 
 pub struct Pawn {
     color: Color,
@@ -47,6 +47,10 @@ impl Piece for Pawn {
 
     fn mark_moved(&mut self) {
         self.has_moved = true;
+    }
+
+    fn piece_type(&self) -> PieceType {
+        PieceType::Pawn
     }
 }
 

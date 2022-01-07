@@ -15,7 +15,7 @@ impl Space {
         if let Some(p) = &self.piece {
             p.draw()
         } else {
-            '_'
+            ' '
         }
     }
 
