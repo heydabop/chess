@@ -132,9 +132,7 @@ impl Board {
             Some(PieceType::Pawn) => self.pawn_can_move(x1, y1, x2, y2),
             Some(PieceType::Rook) => self.rook_can_move(x1, y1, x2, y2),
             Some(PieceType::Bishop) => self.bishop_can_move(x1, y1, x2, y2),
-            Some(PieceType::Queen) => {
-                self.rook_can_move(x1, y1, x2, y2) || self.bishop_can_move(x1, y1, x2, y2)
-            }
+            Some(PieceType::Queen) => self.queen_can_move(x1, y1, x2, y2),
             Some(PieceType::King) => self.king_can_move(x1, y1, x2, y2),
             Some(PieceType::Knight) => self.knight_can_move(x1, y1, x2, y2),
         } {
@@ -283,6 +281,10 @@ impl Board {
         true
     }
 
+    fn queen_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
+        self.rook_can_move(x1, y1, x2, y2) || self.bishop_can_move(x1, y1, x2, y2)
+    }
+
     fn king_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
         let piece = self.space(x1, y1).piece().as_ref().unwrap();
         assert!(
@@ -292,6 +294,9 @@ impl Board {
         );
         // If there is a piece at the destination and its the same color
         if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+            return false;
+        }
+        if self.is_space_attacked(x2, y2, piece.color()) {
             return false;
         }
         let x_abs = (i16::from(x1) - i16::from(x2)).abs();
@@ -314,6 +319,28 @@ impl Board {
         let y_abs = (i16::from(y1) - i16::from(y2)).abs();
         (x_abs == 2 && y_abs == 1) || (x_abs == 1 && y_abs == 2)
     }
+
+    fn is_space_attacked(&self, x: u8, y: u8, color: Color) -> bool {
+        for x0 in 0..8 {
+            for y0 in 0..8 {
+                if let Some(piece) = self.space(x0, y0).piece() {
+                    if piece.color() != color {
+                        if match piece.piece_type() {
+                            PieceType::Pawn => self.pawn_can_move(x0, y0, x, y),
+                            PieceType::Rook => self.rook_can_move(x0, y0, x, y),
+                            PieceType::Bishop => self.bishop_can_move(x0, y0, x, y),
+                            PieceType::Queen => self.queen_can_move(x0, y0, x, y),
+                            PieceType::King => self.king_can_move(x0, y0, x, y),
+                            PieceType::Knight => self.knight_can_move(x0, y0, x0, y),
+                        } {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
 }
 
 impl Default for Board {
@@ -331,9 +358,9 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp, 0, 1)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 0, 2), true);
+        assert!(b.pawn_can_move(0, 1, 0, 2));
         let b = Board::make_custom(vec![(bp, 0, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(0, 6, 0, 5), true);
+        assert!(b.pawn_can_move(0, 6, 0, 5));
     }
 
     #[test]
@@ -341,9 +368,9 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp.clone(), 0, 1), (bp.clone(), 1, 2)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 1, 2), true);
+        assert!(b.pawn_can_move(0, 1, 1, 2));
         let b = Board::make_custom(vec![(wp, 0, 5), (bp, 1, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(1, 6, 0, 5), true);
+        assert!(b.pawn_can_move(1, 6, 0, 5));
     }
 
     #[test]
@@ -351,13 +378,13 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp.clone(), 0, 1), (bp.clone(), 0, 2)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 0, 2), false);
+        assert!(!b.pawn_can_move(0, 1, 0, 2));
         let b = Board::make_custom(vec![(wp.clone(), 0, 5), (bp.clone(), 0, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(0, 6, 0, 5), false);
+        assert!(!b.pawn_can_move(0, 6, 0, 5));
         let b = Board::make_custom(vec![(wp.clone(), 0, 1), (bp.clone(), 0, 3)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 0, 3), false);
+        assert!(!b.pawn_can_move(0, 1, 0, 3));
         let b = Board::make_custom(vec![(wp, 0, 4), (bp, 0, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(0, 6, 0, 4), false);
+        assert!(!b.pawn_can_move(0, 6, 0, 4));
     }
 
     #[test]
@@ -365,9 +392,9 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp, 0, 1)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 0, 3), true);
+        assert!(b.pawn_can_move(0, 1, 0, 3));
         let b = Board::make_custom(vec![(bp, 0, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(0, 6, 0, 4), true);
+        assert!(b.pawn_can_move(0, 6, 0, 4));
     }
 
     #[test]
@@ -377,9 +404,9 @@ mod tests {
         wp.mark_moved();
         bp.mark_moved();
         let b = Board::make_custom(vec![(wp, 0, 1)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 0, 3), false);
+        assert!(!b.pawn_can_move(0, 1, 0, 3));
         let b = Board::make_custom(vec![(bp, 0, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(0, 6, 0, 4), false);
+        assert!(!b.pawn_can_move(0, 6, 0, 4));
     }
 
     #[test]
@@ -387,9 +414,9 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp, 0, 1)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 1, 2), false);
+        assert!(!b.pawn_can_move(0, 1, 1, 2));
         let b = Board::make_custom(vec![(bp, 1, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(1, 6, 0, 5), false);
+        assert!(!b.pawn_can_move(1, 6, 0, 5));
     }
 
     #[test]
@@ -397,13 +424,13 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp.clone(), 0, 1), (bp.clone(), 1, 3)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 1, 3), false);
+        assert!(!b.pawn_can_move(0, 1, 1, 3));
         let b = Board::make_custom(vec![(wp.clone(), 0, 4), (bp.clone(), 1, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(1, 6, 0, 4), false);
+        assert!(!b.pawn_can_move(1, 6, 0, 4));
         let b = Board::make_custom(vec![(wp, 0, 1)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 1, 3), false);
+        assert!(!b.pawn_can_move(0, 1, 1, 3));
         let b = Board::make_custom(vec![(bp, 1, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(1, 6, 0, 4), false);
+        assert!(!b.pawn_can_move(1, 6, 0, 4));
     }
 
     #[test]
@@ -411,9 +438,9 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp, 0, 1)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 0, 0), false);
+        assert!(!b.pawn_can_move(0, 1, 0, 0));
         let b = Board::make_custom(vec![(bp, 0, 6)], Color::Black);
-        assert_eq!(b.pawn_can_move(0, 6, 0, 7), false);
+        assert!(!b.pawn_can_move(0, 6, 0, 7));
     }
 
     #[test]
@@ -421,9 +448,9 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp.clone(), 0, 1), (bp.clone(), 0, 2)], Color::White);
-        assert_eq!(b.pawn_can_move(0, 1, 0, 3), false);
+        assert!(!b.pawn_can_move(0, 1, 0, 3));
         let b = Board::make_custom(vec![(bp, 0, 6), (wp, 0, 5)], Color::Black);
-        assert_eq!(b.pawn_can_move(0, 6, 0, 4), false);
+        assert!(!b.pawn_can_move(0, 6, 0, 4));
     }
 
     #[test]
@@ -431,9 +458,9 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let mut b = Board::make_custom(vec![(wp, 0, 1), (bp, 1, 3)], Color::White);
-        assert_eq!(b.move_piece(0, 1, 0, 3), true);
+        assert!(b.move_piece(0, 1, 0, 3));
         b.next_turn();
-        assert_eq!(b.move_piece(1, 3, 0, 2), true);
+        assert!(b.move_piece(1, 3, 0, 2));
         assert!(b.space(0, 3).piece().is_none());
     }
 
@@ -441,17 +468,17 @@ mod tests {
     fn rook_can_move_into_empty() {
         let wr = Piece::new(PieceType::Rook, Color::White);
         let b = Board::make_custom(vec![(wr, 1, 1)], Color::White);
-        assert_eq!(b.rook_can_move(1, 1, 1, 4), true);
-        assert_eq!(b.rook_can_move(1, 1, 4, 1), true);
-        assert_eq!(b.rook_can_move(1, 1, 0, 1), true);
-        assert_eq!(b.rook_can_move(1, 1, 1, 0), true);
+        assert!(b.rook_can_move(1, 1, 1, 4));
+        assert!(b.rook_can_move(1, 1, 4, 1));
+        assert!(b.rook_can_move(1, 1, 0, 1));
+        assert!(b.rook_can_move(1, 1, 1, 0));
     }
 
     #[test]
     fn rook_cannot_move_diagonally() {
         let wr = Piece::new(PieceType::Rook, Color::White);
         let b = Board::make_custom(vec![(wr, 0, 1)], Color::White);
-        assert_eq!(b.rook_can_move(0, 1, 1, 2), false);
+        assert!(!b.rook_can_move(0, 1, 1, 2));
     }
 
     #[test]
@@ -461,8 +488,8 @@ mod tests {
             vec![(wr.clone(), 0, 1), (wr.clone(), 0, 3), (wr, 1, 1)],
             Color::White,
         );
-        assert_eq!(b.rook_can_move(0, 1, 0, 5), false);
-        assert_eq!(b.rook_can_move(0, 1, 2, 1), false);
+        assert!(!b.rook_can_move(0, 1, 0, 5));
+        assert!(!b.rook_can_move(0, 1, 2, 1));
     }
 
     #[test]
@@ -473,28 +500,28 @@ mod tests {
             vec![(wr.clone(), 1, 1), (br, 1, 5), (wr, 5, 1)],
             Color::White,
         );
-        assert_eq!(b.rook_can_move(1, 1, 5, 1), false);
-        assert_eq!(b.rook_can_move(1, 1, 1, 5), true);
+        assert!(!b.rook_can_move(1, 1, 5, 1));
+        assert!(b.rook_can_move(1, 1, 1, 5));
     }
 
     #[test]
     fn bishop_can_move_into_empty() {
         let wb = Piece::new(PieceType::Bishop, Color::White);
         let b = Board::make_custom(vec![(wb, 2, 3)], Color::White);
-        assert_eq!(b.bishop_can_move(2, 3, 5, 6), true);
-        assert_eq!(b.bishop_can_move(2, 3, 0, 5), true);
-        assert_eq!(b.bishop_can_move(2, 3, 4, 1), true);
-        assert_eq!(b.bishop_can_move(2, 3, 0, 1), true);
+        assert!(b.bishop_can_move(2, 3, 5, 6));
+        assert!(b.bishop_can_move(2, 3, 0, 5));
+        assert!(b.bishop_can_move(2, 3, 4, 1));
+        assert!(b.bishop_can_move(2, 3, 0, 1));
     }
 
     #[test]
     fn bishop_cannot_move_nondiagonally() {
         let wb = Piece::new(PieceType::Bishop, Color::White);
         let b = Board::make_custom(vec![(wb, 2, 3)], Color::White);
-        assert_eq!(b.bishop_can_move(2, 3, 4, 6), false);
-        assert_eq!(b.bishop_can_move(2, 3, 1, 5), false);
-        assert_eq!(b.bishop_can_move(2, 3, 2, 1), false);
-        assert_eq!(b.bishop_can_move(2, 3, 0, 0), false);
+        assert!(!b.bishop_can_move(2, 3, 4, 6));
+        assert!(!b.bishop_can_move(2, 3, 1, 5));
+        assert!(!b.bishop_can_move(2, 3, 2, 1));
+        assert!(!b.bishop_can_move(2, 3, 0, 0));
     }
 
     #[test]
@@ -502,12 +529,12 @@ mod tests {
         let wb = Piece::new(PieceType::Bishop, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wb.clone(), 2, 3), (wb.clone(), 4, 5)], Color::White);
-        assert_eq!(b.bishop_can_move(2, 3, 5, 6), false);
+        assert!(!b.bishop_can_move(2, 3, 5, 6));
         let b = Board::make_custom(
             vec![(wb, 7, 2), (bp.clone(), 5, 4), (bp, 4, 5)],
             Color::White,
         );
-        assert_eq!(b.bishop_can_move(7, 2, 4, 5), false);
+        assert!(!b.bishop_can_move(7, 2, 4, 5));
     }
 
     #[test]
@@ -518,19 +545,30 @@ mod tests {
             vec![(wb.clone(), 2, 3), (bb, 4, 5), (wb, 0, 5)],
             Color::White,
         );
-        assert_eq!(b.bishop_can_move(2, 3, 5, 6), false);
-        assert_eq!(b.bishop_can_move(2, 3, 0, 5), false);
-        assert_eq!(b.bishop_can_move(2, 3, 4, 5), true);
+        assert!(!b.bishop_can_move(2, 3, 5, 6));
+        assert!(!b.bishop_can_move(2, 3, 0, 5));
+        assert!(b.bishop_can_move(2, 3, 4, 5));
     }
 
     #[test]
     fn king_can_move_into_empty() {
         let wk = Piece::new(PieceType::King, Color::White);
         let b = Board::make_custom(vec![(wk, 2, 3)], Color::White);
-        assert_eq!(b.king_can_move(2, 3, 2, 4), true);
-        assert_eq!(b.king_can_move(2, 3, 1, 4), true);
-        assert_eq!(b.king_can_move(2, 3, 1, 3), true);
-        assert_eq!(b.king_can_move(2, 3, 3, 2), true);
+        assert!(b.king_can_move(2, 3, 2, 4));
+        assert!(b.king_can_move(2, 3, 1, 4));
+        assert!(b.king_can_move(2, 3, 1, 3));
+        assert!(b.king_can_move(2, 3, 3, 2));
+    }
+
+    #[test]
+    fn king_cannot_move_into_check() {
+        let wk = Piece::new(PieceType::King, Color::White);
+        let bq = Piece::new(PieceType::Queen, Color::Black);
+        let b = Board::make_custom(vec![(wk, 2, 3), (bq, 5, 4)], Color::White);
+        assert!(!b.king_can_move(2, 3, 2, 4));
+        assert!(!b.king_can_move(2, 3, 1, 4));
+        assert!(b.king_can_move(2, 3, 1, 3));
+        assert!(!b.king_can_move(2, 3, 3, 2));
     }
 
     #[test]
@@ -541,19 +579,19 @@ mod tests {
             vec![(wk.clone(), 2, 3), (wk, 2, 4), (bk, 1, 4)],
             Color::White,
         );
-        assert_eq!(b.king_can_move(2, 3, 2, 4), false);
-        assert_eq!(b.king_can_move(2, 3, 1, 4), true);
+        assert!(!b.king_can_move(2, 3, 2, 4));
+        assert!(b.king_can_move(2, 3, 1, 4));
     }
 
     #[test]
     fn knight_can_move_into_empty() {
         let wn = Piece::new(PieceType::Knight, Color::White);
         let b = Board::make_custom(vec![(wn, 6, 2)], Color::White);
-        assert_eq!(b.knight_can_move(6, 2, 5, 4), true);
-        assert_eq!(b.knight_can_move(6, 2, 7, 4), true);
-        assert_eq!(b.knight_can_move(6, 2, 4, 3), true);
-        assert_eq!(b.knight_can_move(6, 2, 5, 0), true);
-        assert_eq!(b.knight_can_move(6, 2, 7, 0), true);
+        assert!(b.knight_can_move(6, 2, 5, 4));
+        assert!(b.knight_can_move(6, 2, 7, 4));
+        assert!(b.knight_can_move(6, 2, 4, 3));
+        assert!(b.knight_can_move(6, 2, 5, 0));
+        assert!(b.knight_can_move(6, 2, 7, 0));
     }
 
     #[test]
@@ -564,7 +602,19 @@ mod tests {
             vec![(wn.clone(), 6, 2), (wn, 5, 4), (bn, 7, 4)],
             Color::White,
         );
-        assert_eq!(b.knight_can_move(6, 2, 5, 4), false);
-        assert_eq!(b.knight_can_move(6, 2, 7, 4), true);
+        assert!(!b.knight_can_move(6, 2, 5, 4));
+        assert!(b.knight_can_move(6, 2, 7, 4));
+    }
+
+    #[test]
+    fn space_is_attacked() {
+        let wq = Piece::new(PieceType::Queen, Color::White);
+        let bq = Piece::new(PieceType::Queen, Color::Black);
+        let b = Board::make_custom(vec![(wq, 3, 4), (bq, 3, 5)], Color::White);
+        assert!(b.is_space_attacked(0, 4, Color::Black));
+        assert!(!b.is_space_attacked(0, 4, Color::White));
+        assert!(!b.is_space_attacked(3, 6, Color::Black));
+        assert!(b.is_space_attacked(3, 6, Color::White));
+        assert!(b.is_space_attacked(1, 7, Color::White));
     }
 }
