@@ -92,6 +92,9 @@ impl Board {
     }
 
     pub fn move_piece(&mut self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
+        if x1 == x2 && y1 == y2 {
+            return false;
+        }
         let piece = self.space(x1, y1).piece();
         let piece2 = self.space(x2, y2).piece();
 
@@ -127,6 +130,8 @@ impl Board {
         if !match piece.as_ref().map(Piece::piece_type) {
             None => false,
             Some(PieceType::Pawn) => self.pawn_can_move(x1, y1, x2, y2),
+            Some(PieceType::Rook) => self.rook_can_move(x1, y1, x2, y2),
+            Some(PieceType::Bishop) => self.bishop_can_move(x1, y1, x2, y2),
             _ => false,
         } {
             return false;
@@ -145,6 +150,11 @@ impl Board {
 
     fn pawn_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
         let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        assert!(
+            !(piece.piece_type() != PieceType::Pawn),
+            "pawn_can_move called on {:?}",
+            piece.piece_type()
+        );
         let piece2 = self.space(x2, y2).piece();
         match piece.color() {
             Color::White => {
@@ -173,6 +183,101 @@ impl Board {
             }
         }
     }
+
+    fn rook_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
+        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        assert!(
+            !(piece.piece_type() != PieceType::Rook),
+            "rook_can_move called on {:?}",
+            piece.piece_type()
+        );
+        // If there is a piece at the destination and its the same color
+        if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+            return false;
+        }
+        // If the move isn't along a single rank or file
+        if x1 != x2 && y1 != y2 {
+            return false;
+        }
+        // Check that there aren't pieces between the origin and destination
+        if x1 == x2 {
+            if y1 < y2 {
+                for i in y1 + 1..y2 {
+                    if self.space(x1, i).piece().is_some() {
+                        return false;
+                    }
+                }
+            } else {
+                for i in y2 + 1..y1 {
+                    if self.space(x1, i).piece().is_some() {
+                        return false;
+                    }
+                }
+            }
+        } else {
+            // y1 == y2
+            if x1 < x2 {
+                for i in x1 + 1..x2 {
+                    if self.space(i, y1).piece().is_some() {
+                        return false;
+                    }
+                }
+            } else {
+                for i in x2 + 1..x1 {
+                    if self.space(i, y1).piece().is_some() {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    fn bishop_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
+        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        assert!(
+            !(piece.piece_type() != PieceType::Bishop),
+            "bishop_can_move called on {:?}",
+            piece.piece_type()
+        );
+        // If there is a piece at the destination and its the same color
+        if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+            return false;
+        }
+        // If the move isn't diagonal
+        if (i16::from(x1) - i16::from(x2)).abs() != (i16::from(y1) - i16::from(y2)).abs() {
+            return false;
+        }
+        // Check that there aren't pieces between the origin and destination
+        if x1 < x2 {
+            if y1 < y2 {
+                for i in 1..x2 - x1 {
+                    if self.space(x1 + i, y1 + i).piece().is_some() {
+                        return false;
+                    }
+                }
+            } else {
+                for i in 1..x2 - x1 {
+                    if self.space(x1 + i, y2 + i).piece().is_some() {
+                        return false;
+                    }
+                }
+            }
+        } else if y1 < y2 {
+            for i in 1..x1 - x2 {
+                if self.space(x2 + i, y1 + i).piece().is_some() {
+                    return false;
+                }
+            }
+        } else {
+            for i in 1..x1 - x2 {
+                if self.space(x2 + i, y2 + i).piece().is_some() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }
 
 impl Default for Board {
@@ -196,7 +301,7 @@ mod tests {
     }
 
     #[test]
-    fn pawn_can_attack() {
+    fn pawn_can_capture() {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp.clone(), 0, 1), (bp.clone(), 1, 2)], Color::White);
@@ -242,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn pawn_cannot_attack_into_empty() {
+    fn pawn_cannot_capture_into_empty() {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp, 0, 1)], Color::White);
@@ -252,7 +357,7 @@ mod tests {
     }
 
     #[test]
-    fn pawn_cannot_move_two_and_attack() {
+    fn pawn_cannot_move_two_and_capture() {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let b = Board::make_custom(vec![(wp.clone(), 0, 1), (bp.clone(), 1, 3)], Color::White);
@@ -283,5 +388,96 @@ mod tests {
         assert_eq!(b.pawn_can_move(0, 1, 0, 3), false);
         let b = Board::make_custom(vec![(bp, 0, 6), (wp, 0, 5)], Color::Black);
         assert_eq!(b.pawn_can_move(0, 6, 0, 4), false);
+    }
+
+    #[test]
+    fn pawn_can_en_passant() {
+        let wp = Piece::new(PieceType::Pawn, Color::White);
+        let bp = Piece::new(PieceType::Pawn, Color::Black);
+        let mut b = Board::make_custom(vec![(wp, 0, 1), (bp, 1, 3)], Color::White);
+        assert_eq!(b.move_piece(0, 1, 0, 3), true);
+        b.next_turn();
+        assert_eq!(b.move_piece(1, 3, 0, 2), true);
+        assert!(b.space(0, 3).piece().is_none());
+    }
+
+    #[test]
+    fn rook_can_move_into_empty() {
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let b = Board::make_custom(vec![(wr, 1, 1)], Color::White);
+        assert_eq!(b.rook_can_move(1, 1, 1, 4), true);
+        assert_eq!(b.rook_can_move(1, 1, 4, 1), true);
+        assert_eq!(b.rook_can_move(1, 1, 0, 1), true);
+        assert_eq!(b.rook_can_move(1, 1, 1, 0), true);
+    }
+
+    #[test]
+    fn rook_cannot_move_diagonally() {
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let b = Board::make_custom(vec![(wr, 0, 1)], Color::White);
+        assert_eq!(b.rook_can_move(0, 1, 1, 2), false);
+    }
+
+    #[test]
+    fn rook_cannot_move_through() {
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let b = Board::make_custom(
+            vec![(wr.clone(), 0, 1), (wr.clone(), 0, 3), (wr, 1, 1)],
+            Color::White,
+        );
+        assert_eq!(b.rook_can_move(0, 1, 0, 5), false);
+        assert_eq!(b.rook_can_move(0, 1, 2, 1), false);
+    }
+
+    #[test]
+    fn rook_can_capture() {
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let br = Piece::new(PieceType::Rook, Color::Black);
+        let b = Board::make_custom(
+            vec![(wr.clone(), 1, 1), (br, 1, 5), (wr, 5, 1)],
+            Color::White,
+        );
+        assert_eq!(b.rook_can_move(1, 1, 5, 1), false);
+        assert_eq!(b.rook_can_move(1, 1, 1, 5), true);
+    }
+
+    #[test]
+    fn bishop_can_move_into_empty() {
+        let wb = Piece::new(PieceType::Bishop, Color::White);
+        let b = Board::make_custom(vec![(wb, 2, 3)], Color::White);
+        assert_eq!(b.bishop_can_move(2, 3, 5, 6), true);
+        assert_eq!(b.bishop_can_move(2, 3, 0, 5), true);
+        assert_eq!(b.bishop_can_move(2, 3, 4, 1), true);
+        assert_eq!(b.bishop_can_move(2, 3, 0, 1), true);
+    }
+
+    #[test]
+    fn bishop_cannot_move_nondiagonally() {
+        let wb = Piece::new(PieceType::Bishop, Color::White);
+        let b = Board::make_custom(vec![(wb, 2, 3)], Color::White);
+        assert_eq!(b.bishop_can_move(2, 3, 4, 6), false);
+        assert_eq!(b.bishop_can_move(2, 3, 1, 5), false);
+        assert_eq!(b.bishop_can_move(2, 3, 2, 1), false);
+        assert_eq!(b.bishop_can_move(2, 3, 0, 0), false);
+    }
+
+    #[test]
+    fn bishop_cannot_move_through() {
+        let wb = Piece::new(PieceType::Bishop, Color::White);
+        let b = Board::make_custom(vec![(wb.clone(), 2, 3), (wb, 4, 5)], Color::White);
+        assert_eq!(b.bishop_can_move(2, 3, 5, 6), false);
+    }
+
+    #[test]
+    fn bishop_can_capture() {
+        let wb = Piece::new(PieceType::Bishop, Color::White);
+        let bb = Piece::new(PieceType::Bishop, Color::Black);
+        let b = Board::make_custom(
+            vec![(wb.clone(), 2, 3), (bb, 4, 5), (wb, 0, 5)],
+            Color::White,
+        );
+        assert_eq!(b.bishop_can_move(2, 3, 5, 6), false);
+        assert_eq!(b.bishop_can_move(2, 3, 0, 5), false);
+        assert_eq!(b.bishop_can_move(2, 3, 4, 5), true);
     }
 }
