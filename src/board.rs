@@ -148,7 +148,11 @@ impl Board {
         let piece2 = self.space(x2, y2).piece();
         match piece.color() {
             Color::White => {
-                (!piece.has_moved() && y1 + 2 == y2 && x1 == x2 && piece2.is_none())
+                (!piece.has_moved()
+                    && y1 + 2 == y2
+                    && x1 == x2
+                    && piece2.is_none()
+                    && self.space(x1, y2 - 1).piece().is_none())
                     || (y1 + 1 == y2
                         && ((x1 == x2 && piece2.is_none())
                             || ((x1 + 1 == x2 || x2 + 1 == x1)
@@ -156,7 +160,11 @@ impl Board {
                                 && piece2.as_ref().unwrap().color() == Color::Black)))
             }
             Color::Black => {
-                (!piece.has_moved() && y2 + 2 == y1 && x1 == x2 && piece2.is_none())
+                (!piece.has_moved()
+                    && y2 + 2 == y1
+                    && x1 == x2
+                    && piece2.is_none()
+                    && self.space(x1, y1 - 1).piece().is_none())
                     || (y2 + 1 == y1
                         && ((x1 == x2 && piece2.is_none())
                             || ((x1 + 1 == x2 || x2 + 1 == x1)
@@ -265,5 +273,15 @@ mod tests {
         assert_eq!(b.pawn_can_move(0, 1, 0, 0), false);
         let b = Board::make_custom(vec![(bp, 0, 6)], Color::Black);
         assert_eq!(b.pawn_can_move(0, 6, 0, 7), false);
+    }
+
+    #[test]
+    fn pawn_cannnot_move_through() {
+        let wp = Piece::new(PieceType::Pawn, Color::White);
+        let bp = Piece::new(PieceType::Pawn, Color::Black);
+        let b = Board::make_custom(vec![(wp.clone(), 0, 1), (bp.clone(), 0, 2)], Color::White);
+        assert_eq!(b.pawn_can_move(0, 1, 0, 3), false);
+        let b = Board::make_custom(vec![(bp, 0, 6), (wp, 0, 5)], Color::Black);
+        assert_eq!(b.pawn_can_move(0, 6, 0, 4), false);
     }
 }
