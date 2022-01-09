@@ -262,20 +262,20 @@ impl Board {
                 }
             } else {
                 for i in 1..x2 - x1 {
-                    if self.space(x1 + i, y2 + i).piece().is_some() {
+                    if self.space(x1 + i, y1 - i).piece().is_some() {
                         return false;
                     }
                 }
             }
         } else if y1 < y2 {
             for i in 1..x1 - x2 {
-                if self.space(x2 + i, y1 + i).piece().is_some() {
+                if self.space(x1 - i, y1 + i).piece().is_some() {
                     return false;
                 }
             }
         } else {
             for i in 1..x1 - x2 {
-                if self.space(x2 + i, y2 + i).piece().is_some() {
+                if self.space(x1 - i, y1 - i).piece().is_some() {
                     return false;
                 }
             }
@@ -484,8 +484,14 @@ mod tests {
     #[test]
     fn bishop_cannot_move_through() {
         let wb = Piece::new(PieceType::Bishop, Color::White);
-        let b = Board::make_custom(vec![(wb.clone(), 2, 3), (wb, 4, 5)], Color::White);
+        let bp = Piece::new(PieceType::Pawn, Color::Black);
+        let b = Board::make_custom(vec![(wb.clone(), 2, 3), (wb.clone(), 4, 5)], Color::White);
         assert_eq!(b.bishop_can_move(2, 3, 5, 6), false);
+        let b = Board::make_custom(
+            vec![(wb, 7, 2), (bp.clone(), 5, 4), (bp, 4, 5)],
+            Color::White,
+        );
+        assert_eq!(b.bishop_can_move(7, 2, 4, 5), false);
     }
 
     #[test]

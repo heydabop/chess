@@ -30,6 +30,7 @@ fn main() -> Result<()> {
     queue_board(&board)?;
     queue!(
         stdout,
+        cursor::MoveLeft(1),
         cursor::SetCursorShape(cursor::CursorShape::Block),
         cursor::EnableBlinking,
         cursor::Show,
@@ -52,14 +53,22 @@ fn game_loop(mut board: Board) -> Result<()> {
     loop {
         let e = read()?;
         if let Event::Key(k) = e {
+            let pos = cursor::position()?;
             match k.code {
                 KeyCode::Up => execute!(stdout, cursor::MoveUp(1))?,
-                KeyCode::Down => execute!(stdout, cursor::MoveDown(1))?,
+                KeyCode::Down => {
+                    if pos.1 < 7 {
+                        execute!(stdout, cursor::MoveDown(1))?;
+                    }
+                }
                 KeyCode::Left => execute!(stdout, cursor::MoveLeft(1))?,
-                KeyCode::Right => execute!(stdout, cursor::MoveRight(1))?,
+                KeyCode::Right => {
+                    if pos.0 < 7 {
+                        execute!(stdout, cursor::MoveRight(1))?;
+                    }
+                }
                 KeyCode::Char('q') => return Ok(()),
                 KeyCode::Char(' ') => {
-                    let pos = cursor::position()?;
                     if pos.0 > 7 || pos.1 > 7 {
                         continue;
                     }
