@@ -132,6 +132,10 @@ impl Board {
             Some(PieceType::Pawn) => self.pawn_can_move(x1, y1, x2, y2),
             Some(PieceType::Rook) => self.rook_can_move(x1, y1, x2, y2),
             Some(PieceType::Bishop) => self.bishop_can_move(x1, y1, x2, y2),
+            Some(PieceType::Queen) => {
+                self.rook_can_move(x1, y1, x2, y2) || self.bishop_can_move(x1, y1, x2, y2)
+            }
+            Some(PieceType::King) => self.king_can_move(x1, y1, x2, y2),
             _ => false,
         } {
             return false;
@@ -187,7 +191,7 @@ impl Board {
     fn rook_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
         let piece = self.space(x1, y1).piece().as_ref().unwrap();
         assert!(
-            !(piece.piece_type() != PieceType::Rook),
+            !(piece.piece_type() != PieceType::Rook && piece.piece_type() != PieceType::Queen),
             "rook_can_move called on {:?}",
             piece.piece_type()
         );
@@ -236,7 +240,7 @@ impl Board {
     fn bishop_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
         let piece = self.space(x1, y1).piece().as_ref().unwrap();
         assert!(
-            !(piece.piece_type() != PieceType::Bishop),
+            !(piece.piece_type() != PieceType::Bishop && piece.piece_type() != PieceType::Queen),
             "bishop_can_move called on {:?}",
             piece.piece_type()
         );
@@ -277,6 +281,22 @@ impl Board {
             }
         }
         true
+    }
+
+    fn king_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
+        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        assert!(
+            !(piece.piece_type() != PieceType::King),
+            "king_can_move called on {:?}",
+            piece.piece_type()
+        );
+        // If there is a piece at the destination and its the same color
+        if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+            return false;
+        }
+        let x_abs = i16::from(x1) - i16::from(x2).abs();
+        let y_abs = i16::from(y1) - i16::from(y2).abs();
+        x_abs <= 1 && y_abs <= 1
     }
 }
 
@@ -479,5 +499,27 @@ mod tests {
         assert_eq!(b.bishop_can_move(2, 3, 5, 6), false);
         assert_eq!(b.bishop_can_move(2, 3, 0, 5), false);
         assert_eq!(b.bishop_can_move(2, 3, 4, 5), true);
+    }
+
+    #[test]
+    fn king_can_move_into_empty() {
+        let wk = Piece::new(PieceType::King, Color::White);
+        let b = Board::make_custom(vec![(wk, 2, 3)], Color::White);
+        assert_eq!(b.king_can_move(2, 3, 2, 4), true);
+        assert_eq!(b.king_can_move(2, 3, 1, 4), true);
+        assert_eq!(b.king_can_move(2, 3, 1, 3), true);
+        assert_eq!(b.king_can_move(2, 3, 3, 2), true);
+    }
+
+    #[test]
+    fn king_can_capture() {
+        let wk = Piece::new(PieceType::King, Color::White);
+        let bk = Piece::new(PieceType::King, Color::Black);
+        let b = Board::make_custom(
+            vec![(wk.clone(), 2, 3), (wk, 2, 4), (bk, 1, 4)],
+            Color::White,
+        );
+        assert_eq!(b.king_can_move(2, 3, 2, 4), false);
+        assert_eq!(b.king_can_move(2, 3, 1, 4), true);
     }
 }
