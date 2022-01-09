@@ -3,11 +3,11 @@ use crate::piece::Piece;
 
 pub struct Space {
     color: Color,
-    piece: Option<Box<dyn Piece>>,
+    piece: Option<Piece>,
 }
 
 impl Space {
-    pub fn new(color: Color, piece: Option<Box<dyn Piece>>) -> Self {
+    pub fn new(color: Color, piece: Option<Piece>) -> Self {
         Self { color, piece }
     }
 
@@ -19,23 +19,23 @@ impl Space {
         }
     }
 
-    pub fn piece(&self) -> &Option<Box<dyn Piece>> {
+    pub fn piece(&self) -> &Option<Piece> {
         &self.piece
     }
 
     pub fn piece_color(&self) -> Option<Color> {
-        self.piece.as_ref().map(|p| p.color())
+        self.piece.as_ref().map(Piece::color)
     }
 
     pub fn color(&self) -> Color {
         self.color
     }
 
-    pub fn remove_piece(&mut self) -> Option<Box<dyn Piece>> {
+    pub fn remove_piece(&mut self) -> Option<Piece> {
         self.piece.take()
     }
 
-    pub fn set_piece(&mut self, piece: Option<Box<dyn Piece>>) {
+    pub fn set_piece(&mut self, piece: Option<Piece>) {
         self.piece = piece;
     }
 }
