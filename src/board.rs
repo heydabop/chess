@@ -136,7 +136,7 @@ impl Board {
                 self.rook_can_move(x1, y1, x2, y2) || self.bishop_can_move(x1, y1, x2, y2)
             }
             Some(PieceType::King) => self.king_can_move(x1, y1, x2, y2),
-            _ => false,
+            Some(PieceType::Knight) => self.knight_can_move(x1, y1, x2, y2),
         } {
             return false;
         }
@@ -294,9 +294,25 @@ impl Board {
         if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
             return false;
         }
-        let x_abs = i16::from(x1) - i16::from(x2).abs();
-        let y_abs = i16::from(y1) - i16::from(y2).abs();
+        let x_abs = (i16::from(x1) - i16::from(x2)).abs();
+        let y_abs = (i16::from(y1) - i16::from(y2)).abs();
         x_abs <= 1 && y_abs <= 1
+    }
+
+    fn knight_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
+        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        assert!(
+            !(piece.piece_type() != PieceType::Knight),
+            "knight_can_move called on {:?}",
+            piece.piece_type()
+        );
+        // If there is a piece at the destination and its the same color
+        if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+            return false;
+        }
+        let x_abs = (i16::from(x1) - i16::from(x2)).abs();
+        let y_abs = (i16::from(y1) - i16::from(y2)).abs();
+        (x_abs == 2 && y_abs == 1) || (x_abs == 1 && y_abs == 2)
     }
 }
 
@@ -527,5 +543,28 @@ mod tests {
         );
         assert_eq!(b.king_can_move(2, 3, 2, 4), false);
         assert_eq!(b.king_can_move(2, 3, 1, 4), true);
+    }
+
+    #[test]
+    fn knight_can_move_into_empty() {
+        let wn = Piece::new(PieceType::Knight, Color::White);
+        let b = Board::make_custom(vec![(wn, 6, 2)], Color::White);
+        assert_eq!(b.knight_can_move(6, 2, 5, 4), true);
+        assert_eq!(b.knight_can_move(6, 2, 7, 4), true);
+        assert_eq!(b.knight_can_move(6, 2, 4, 3), true);
+        assert_eq!(b.knight_can_move(6, 2, 5, 0), true);
+        assert_eq!(b.knight_can_move(6, 2, 7, 0), true);
+    }
+
+    #[test]
+    fn knight_can_capture() {
+        let wn = Piece::new(PieceType::Knight, Color::White);
+        let bn = Piece::new(PieceType::Knight, Color::Black);
+        let b = Board::make_custom(
+            vec![(wn.clone(), 6, 2), (wn, 5, 4), (bn, 7, 4)],
+            Color::White,
+        );
+        assert_eq!(b.knight_can_move(6, 2, 5, 4), false);
+        assert_eq!(b.knight_can_move(6, 2, 7, 4), true);
     }
 }
