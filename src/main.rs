@@ -1,7 +1,7 @@
 #![feature(array_from_fn)]
 #![allow(dead_code)]
 #![warn(clippy::pedantic)]
-#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::module_name_repetitions, clippy::too_many_lines)]
 
 mod board;
 mod color;

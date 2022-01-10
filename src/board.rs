@@ -96,10 +96,14 @@ impl Board {
             return false;
         }
         let piece = self.space(x1, y1).piece();
+        if piece.is_none() {
+            return false;
+        }
+        let piece = piece.as_ref().unwrap();
         let piece2 = self.space(x2, y2).piece();
 
         // Check and execute en passant here since piece removal from capture is different than normal
-        if piece.as_ref().map(Piece::piece_type) == Some(PieceType::Pawn)
+        if piece.piece_type() == PieceType::Pawn
             && piece2.is_none()
             && ((self.turn_color == Color::White && y1 == 4 && y2 == 5)
                 || (self.turn_color == Color::Black && y1 == 3 && y2 == 2))
@@ -127,14 +131,71 @@ impl Board {
             }
         }
 
-        if !match piece.as_ref().map(Piece::piece_type) {
-            None => false,
-            Some(PieceType::Pawn) => self.pawn_can_move(x1, y1, x2, y2),
-            Some(PieceType::Rook) => self.rook_can_move(x1, y1, x2, y2),
-            Some(PieceType::Bishop) => self.bishop_can_move(x1, y1, x2, y2),
-            Some(PieceType::Queen) => self.queen_can_move(x1, y1, x2, y2),
-            Some(PieceType::King) => self.king_can_move(x1, y1, x2, y2),
-            Some(PieceType::Knight) => self.knight_can_move(x1, y1, x2, y2),
+        // Check and execute castling here since piece movement is different than normal
+        if piece.piece_type() == PieceType::King
+            && !piece.has_moved()
+            && (x1 + 2 == x2 || x2 + 2 == x1)
+            && piece2.is_none()
+        {
+            let rank = match piece.color() {
+                Color::White => 0,
+                Color::Black => 7,
+            };
+            if y1 == rank && y2 == rank {
+                let rook = if x1 + 2 == x2 {
+                    self.space(7, rank).piece()
+                } else {
+                    //we already checked that either x1 + 2 == x2 or x2 + 2 == x1
+                    self.space(0, rank).piece()
+                };
+                if let Some(rook) = rook {
+                    if !rook.has_moved() && rook.color() == piece.color() {
+                        // king cannot move out of, through, or into check
+                        if self.is_space_attacked(x1, y1, piece.color()) {
+                            return false;
+                        }
+                        if x1 + 2 == x2 {
+                            if self.is_space_attacked(x1 + 1, y1, piece.color())
+                                || self.is_space_attacked(x2, y1, piece.color())
+                                || self.space(x1 + 1, y1).piece().is_some()
+                            {
+                                return false;
+                            }
+                        } else if self.is_space_attacked(x1 - 1, y1, piece.color())
+                            || self.is_space_attacked(x2, y1, piece.color())
+                            || self.space(x1 - 1, y1).piece().is_some()
+                        {
+                            return false;
+                        }
+                        let mut piece = self.spaces[y1 as usize][x1 as usize]
+                            .remove_piece()
+                            .unwrap();
+                        piece.mark_moved();
+                        self.moves
+                            .push(MoveRecord::new(x1, y1, x2, y2, true, piece.piece_type()));
+                        self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
+                        if x1 + 2 == x2 {
+                            let mut rook = self.spaces[y1 as usize][7].remove_piece().unwrap();
+                            rook.mark_moved();
+                            self.spaces[y1 as usize][5].set_piece(Some(rook));
+                        } else {
+                            let mut rook = self.spaces[y1 as usize][0].remove_piece().unwrap();
+                            rook.mark_moved();
+                            self.spaces[y1 as usize][3].set_piece(Some(rook));
+                        }
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if !match piece.piece_type() {
+            PieceType::Pawn => self.pawn_can_move(x1, y1, x2, y2),
+            PieceType::Rook => self.rook_can_move(x1, y1, x2, y2),
+            PieceType::Bishop => self.bishop_can_move(x1, y1, x2, y2),
+            PieceType::Queen => self.queen_can_move(x1, y1, x2, y2),
+            PieceType::King => self.king_can_move(x1, y1, x2, y2),
+            PieceType::Knight => self.knight_can_move(x1, y1, x2, y2),
         } {
             return false;
         }
@@ -296,12 +357,15 @@ impl Board {
         if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
             return false;
         }
+        let x_abs = (i16::from(x1) - i16::from(x2)).abs();
+        let y_abs = (i16::from(y1) - i16::from(y2)).abs();
+        if x_abs > 1 || y_abs > 1 {
+            return false;
+        }
         if self.is_space_attacked(x2, y2, piece.color()) {
             return false;
         }
-        let x_abs = (i16::from(x1) - i16::from(x2)).abs();
-        let y_abs = (i16::from(y1) - i16::from(y2)).abs();
-        x_abs <= 1 && y_abs <= 1
+        true
     }
 
     fn knight_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
@@ -323,18 +387,21 @@ impl Board {
     fn is_space_attacked(&self, x: u8, y: u8, color: Color) -> bool {
         for x0 in 0..8 {
             for y0 in 0..8 {
+                if x0 == x && y0 == y {
+                    continue;
+                }
                 if let Some(piece) = self.space(x0, y0).piece() {
-                    if piece.color() != color {
-                        if match piece.piece_type() {
+                    if piece.color() != color
+                        && match piece.piece_type() {
                             PieceType::Pawn => self.pawn_can_move(x0, y0, x, y),
                             PieceType::Rook => self.rook_can_move(x0, y0, x, y),
                             PieceType::Bishop => self.bishop_can_move(x0, y0, x, y),
                             PieceType::Queen => self.queen_can_move(x0, y0, x, y),
                             PieceType::King => self.king_can_move(x0, y0, x, y),
                             PieceType::Knight => self.knight_can_move(x0, y0, x0, y),
-                        } {
-                            return true;
                         }
+                    {
+                        return true;
                     }
                 }
             }
@@ -616,5 +683,76 @@ mod tests {
         assert!(!b.is_space_attacked(3, 6, Color::Black));
         assert!(b.is_space_attacked(3, 6, Color::White));
         assert!(b.is_space_attacked(1, 7, Color::White));
+    }
+
+    #[test]
+    fn queenside_castle() {
+        let wk = Piece::new(PieceType::King, Color::White);
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let mut b = Board::make_custom(vec![(wk, 4, 0), (wr, 0, 0)], Color::White);
+        assert!(b.move_piece(4, 0, 2, 0));
+        assert_eq!(
+            b.space(2, 0).piece().as_ref().unwrap().piece_type(),
+            PieceType::King
+        );
+        assert_eq!(
+            b.space(3, 0).piece().as_ref().unwrap().piece_type(),
+            PieceType::Rook
+        );
+        let bk = Piece::new(PieceType::King, Color::Black);
+        let br = Piece::new(PieceType::Rook, Color::Black);
+        let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 0, 7)], Color::White);
+        assert!(b.move_piece(4, 7, 2, 7));
+        assert_eq!(
+            b.space(2, 7).piece().as_ref().unwrap().piece_type(),
+            PieceType::King
+        );
+        assert_eq!(
+            b.space(3, 7).piece().as_ref().unwrap().piece_type(),
+            PieceType::Rook
+        );
+    }
+
+    #[test]
+    fn kingside_castle() {
+        let wk = Piece::new(PieceType::King, Color::White);
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let mut b = Board::make_custom(vec![(wk, 4, 0), (wr, 7, 0)], Color::White);
+        assert!(b.move_piece(4, 0, 6, 0));
+        assert_eq!(
+            b.space(6, 0).piece().as_ref().unwrap().piece_type(),
+            PieceType::King
+        );
+        assert_eq!(
+            b.space(5, 0).piece().as_ref().unwrap().piece_type(),
+            PieceType::Rook
+        );
+        let bk = Piece::new(PieceType::King, Color::Black);
+        let br = Piece::new(PieceType::Rook, Color::Black);
+        let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 7, 7)], Color::White);
+        assert!(b.move_piece(4, 7, 6, 7));
+        assert_eq!(
+            b.space(6, 7).piece().as_ref().unwrap().piece_type(),
+            PieceType::King
+        );
+        assert_eq!(
+            b.space(5, 7).piece().as_ref().unwrap().piece_type(),
+            PieceType::Rook
+        );
+    }
+
+    #[test]
+    fn cant_castle_through_check() {
+        let wk = Piece::new(PieceType::King, Color::White);
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let br = Piece::new(PieceType::Rook, Color::Black);
+        let mut b = Board::make_custom(
+            vec![(wk, 4, 0), (wr.clone(), 7, 0), (br.clone(), 5, 2)],
+            Color::White,
+        );
+        assert!(!b.move_piece(4, 0, 6, 0));
+        let bk = Piece::new(PieceType::King, Color::Black);
+        let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 7, 7), (wr, 5, 5)], Color::White);
+        assert!(!b.move_piece(4, 7, 6, 7));
     }
 }
