@@ -1,6 +1,6 @@
 use crate::piece::PieceType;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MoveRecord {
     origin: (u8, u8),
     dest: (u8, u8),

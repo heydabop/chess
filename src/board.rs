@@ -4,6 +4,7 @@ use crate::piece::{Piece, PieceType};
 use crate::space::Space;
 use std::array::from_fn;
 
+#[derive(Debug, PartialEq)]
 pub struct Board {
     spaces: [[Space; 8]; 8],
     turn_color: Color,
@@ -68,6 +69,58 @@ impl Board {
         Self {
             spaces,
             turn_color: starting_color,
+            moves: vec![],
+        }
+    }
+
+    // TODO: this only sets piece placements and turn color, it doesnt set moves or mark pieces as having moved
+    pub fn from_strs(state: &[&str]) -> Self {
+        assert!(
+            state.len() == 9,
+            "Expected 9 strs in board state, got {}",
+            state.len()
+        );
+        let spaces = from_fn(|row| {
+            let chars: Vec<char> = state[7 - row].chars().collect();
+            assert!(
+                chars.len() == 8,
+                "Expected each row to be 8 chars, found row with {} chars",
+                chars.len()
+            );
+            from_fn(|col| {
+                let color = if (row + col) % 2 == 0 {
+                    Color::Black
+                } else {
+                    Color::White
+                };
+                #[allow(clippy::match_on_vec_items)]
+                let piece = match chars[col] {
+                    '_' => None,
+                    'K' => Some(Piece::new(PieceType::King, Color::White)),
+                    'k' => Some(Piece::new(PieceType::King, Color::Black)),
+                    'Q' => Some(Piece::new(PieceType::Queen, Color::White)),
+                    'q' => Some(Piece::new(PieceType::Queen, Color::Black)),
+                    'R' => Some(Piece::new(PieceType::Rook, Color::White)),
+                    'r' => Some(Piece::new(PieceType::Rook, Color::Black)),
+                    'B' => Some(Piece::new(PieceType::Bishop, Color::White)),
+                    'b' => Some(Piece::new(PieceType::Bishop, Color::Black)),
+                    'N' => Some(Piece::new(PieceType::Knight, Color::White)),
+                    'n' => Some(Piece::new(PieceType::Knight, Color::Black)),
+                    'P' => Some(Piece::new(PieceType::Pawn, Color::White)),
+                    'p' => Some(Piece::new(PieceType::Pawn, Color::Black)),
+                    _ => panic!("Unrecognized character in board state str"),
+                };
+                Space::new(color, piece)
+            })
+        });
+        let turn_color = match state[8].chars().next() {
+            Some('W') => Color::White,
+            Some('B') => Color::Black,
+            _ => panic!("Unrecognized character in board state color"),
+        };
+        Self {
+            spaces,
+            turn_color,
             moves: vec![],
         }
     }
@@ -754,5 +807,16 @@ mod tests {
         let bk = Piece::new(PieceType::King, Color::Black);
         let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 7, 7), (wr, 5, 5)], Color::White);
         assert!(!b.move_piece(4, 7, 6, 7));
+    }
+
+    #[test]
+    fn board_from_strs_default() {
+        let b = Board::new();
+        let strs = vec![
+            "rnbqkbnr", "pppppppp", "________", "________", "________", "________", "PPPPPPPP",
+            "RNBQKBNR", "W",
+        ];
+        let b2 = Board::from_strs(&strs);
+        assert_eq!(b, b2);
     }
 }
