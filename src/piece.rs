@@ -35,6 +35,10 @@ impl Piece {
         self.has_moved = true;
     }
 
+    pub fn unmark_moved(&mut self) {
+        self.has_moved = false;
+    }
+
     pub fn has_moved(&self) -> bool {
         self.has_moved
     }

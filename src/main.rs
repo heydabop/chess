@@ -49,6 +49,8 @@ fn main() -> Result<()> {
 fn game_loop(mut board: Board) -> Result<()> {
     let mut stdout = stdout();
     let mut selected: Option<(u8, u8)> = None;
+    let mut undoing = false;
+    let mut quitting = false;
 
     loop {
         let e = read()?;
@@ -67,7 +69,24 @@ fn game_loop(mut board: Board) -> Result<()> {
                         execute!(stdout, cursor::MoveRight(1))?;
                     }
                 }
-                KeyCode::Char('q') => return Ok(()),
+                KeyCode::Char('z') => undoing = !undoing,
+                KeyCode::Char('y') => {
+                    if undoing {
+                        board.undo_last_move();
+                        undoing = false;
+                        queue_board(&board)?;
+                        #[allow(clippy::cast_possible_truncation)]
+                        let x = pos.0 as u8;
+                        #[allow(clippy::cast_possible_truncation)]
+                        let y = (7 - pos.1) as u8;
+                        queue!(stdout, cursor::MoveTo(x.into(), (7 - y).into()))?;
+                        stdout.flush()?;
+                    }
+                    if quitting {
+                        return Ok(());
+                    }
+                }
+                KeyCode::Char('q') => quitting = !quitting,
                 KeyCode::Char(' ') => {
                     if pos.0 > 7 || pos.1 > 7 {
                         continue;
@@ -112,7 +131,7 @@ fn game_loop(mut board: Board) -> Result<()> {
                     }
                 }
                 _ => {}
-            }
+            };
         }
     }
 }

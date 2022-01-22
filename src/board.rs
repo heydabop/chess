@@ -174,9 +174,17 @@ impl Board {
                     let mut piece = self.spaces[y1 as usize][x1 as usize]
                         .remove_piece()
                         .unwrap();
+                    let piece2 = self.spaces[y2 as usize][x2 as usize].remove_piece();
+                    self.moves.push(MoveRecord::new(
+                        x1,
+                        y1,
+                        x2,
+                        y2,
+                        piece2,
+                        piece.piece_type(),
+                        !piece.has_moved(),
+                    ));
                     piece.mark_moved();
-                    self.moves
-                        .push(MoveRecord::new(x1, y1, x2, y2, true, piece.piece_type()));
                     self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
                     self.spaces[last_dest.1 as usize][last_dest.0 as usize].set_piece(None); // remove last_move pawn
                     return true;
@@ -223,9 +231,17 @@ impl Board {
                         let mut piece = self.spaces[y1 as usize][x1 as usize]
                             .remove_piece()
                             .unwrap();
+                        let piece2 = self.spaces[y2 as usize][x2 as usize].remove_piece();
+                        self.moves.push(MoveRecord::new(
+                            x1,
+                            y1,
+                            x2,
+                            y2,
+                            piece2,
+                            piece.piece_type(),
+                            !piece.has_moved(),
+                        ));
                         piece.mark_moved();
-                        self.moves
-                            .push(MoveRecord::new(x1, y1, x2, y2, true, piece.piece_type()));
                         self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
                         if x1 + 2 == x2 {
                             let mut rook = self.spaces[y1 as usize][7].remove_piece().unwrap();
@@ -253,15 +269,42 @@ impl Board {
             return false;
         }
 
-        let capture = piece2.is_some();
         let mut piece = self.spaces[y1 as usize][x1 as usize]
             .remove_piece()
             .unwrap();
+        let piece2 = self.spaces[y2 as usize][x2 as usize].remove_piece();
+        self.moves.push(MoveRecord::new(
+            x1,
+            y1,
+            x2,
+            y2,
+            piece2,
+            piece.piece_type(),
+            !piece.has_moved(),
+        ));
         piece.mark_moved();
-        self.moves
-            .push(MoveRecord::new(x1, y1, x2, y2, capture, piece.piece_type()));
         self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
         true
+    }
+
+    pub fn undo_last_move(&mut self) {
+        if self.moves.is_empty() {
+            return;
+        }
+        let mut last_move = self.moves.pop().unwrap();
+        let (x1, y1) = last_move.origin();
+        let (x2, y2) = last_move.dest();
+        let mut piece = self.spaces[y2 as usize][x2 as usize]
+            .remove_piece()
+            .unwrap();
+        if last_move.first_move() {
+            piece.unmark_moved();
+        }
+        self.spaces[y1 as usize][x1 as usize].set_piece(Some(piece));
+        if last_move.is_capture() {
+            let piece2 = last_move.take_captured_piece();
+            self.spaces[y2 as usize][x2 as usize].set_piece(piece2);
+        }
     }
 
     fn pawn_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
@@ -817,6 +860,30 @@ mod tests {
             "RNBQKBNR", "W",
         ];
         let b2 = Board::from_strs(&strs);
+        assert_eq!(b, b2);
+    }
+
+    #[test]
+    fn undo_first_move() {
+        let mut b = Board::new();
+        let b2 = Board::new();
+        assert!(b.move_piece(1, 1, 1, 3));
+        assert_ne!(b, b2);
+        b.undo_last_move();
+        assert_eq!(b, b2);
+    }
+
+    #[test]
+    fn undo_capture() {
+        let mut b = Board::new();
+        let mut b2 = Board::new();
+        assert!(b.move_piece(1, 1, 1, 3));
+        assert!(b2.move_piece(1, 1, 1, 3));
+        assert!(b.move_piece(2, 6, 2, 4));
+        assert!(b2.move_piece(2, 6, 2, 4));
+        assert!(b.move_piece(1, 3, 2, 4));
+        assert_ne!(b, b2);
+        b.undo_last_move();
         assert_eq!(b, b2);
     }
 }
