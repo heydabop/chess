@@ -4,7 +4,7 @@ use crate::piece::{Piece, PieceType};
 use crate::space::Space;
 use std::array::from_fn;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Board {
     spaces: [[Space; 8]; 8],
     turn_color: Color,
@@ -153,6 +153,7 @@ impl Board {
             return false;
         }
         let piece = piece.as_ref().unwrap();
+        let color = piece.color();
         let piece2 = self.space(x2, y2).piece();
 
         // Check and execute en passant here since piece removal from capture is different than normal
@@ -198,7 +199,7 @@ impl Board {
             && (x1 + 2 == x2 || x2 + 2 == x1)
             && piece2.is_none()
         {
-            let rank = match piece.color() {
+            let rank = match color {
                 Color::White => 0,
                 Color::Black => 7,
             };
@@ -210,20 +211,20 @@ impl Board {
                     self.space(0, rank).piece()
                 };
                 if let Some(rook) = rook {
-                    if !rook.has_moved() && rook.color() == piece.color() {
+                    if !rook.has_moved() && rook.color() == color {
                         // king cannot move out of, through, or into check
-                        if self.is_space_attacked(x1, y1, piece.color()) {
+                        if self.is_space_attacked(x1, y1, color) {
                             return false;
                         }
                         if x1 + 2 == x2 {
-                            if self.is_space_attacked(x1 + 1, y1, piece.color())
-                                || self.is_space_attacked(x2, y1, piece.color())
+                            if self.is_space_attacked(x1 + 1, y1, color)
+                                || self.is_space_attacked(x2, y1, color)
                                 || self.space(x1 + 1, y1).piece().is_some()
                             {
                                 return false;
                             }
-                        } else if self.is_space_attacked(x1 - 1, y1, piece.color())
-                            || self.is_space_attacked(x2, y1, piece.color())
+                        } else if self.is_space_attacked(x1 - 1, y1, color)
+                            || self.is_space_attacked(x2, y1, color)
                             || self.space(x1 - 1, y1).piece().is_some()
                         {
                             return false;
@@ -284,6 +285,13 @@ impl Board {
         ));
         piece.mark_moved();
         self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
+
+        // undo this move if it has put the player in check
+        if self.is_in_check(color) {
+            self.undo_last_move();
+            return false;
+        }
+
         true
     }
 
@@ -504,6 +512,25 @@ impl Board {
         }
         false
     }
+
+    fn is_in_check(&self, color: Color) -> bool {
+        //find king
+        let pos = self.spaces.iter().enumerate().find_map(|(y, row)| {
+            return row.iter().enumerate().find_map(|(x, space)| {
+                if let Some(piece) = space.piece() {
+                    if piece.piece_type() == PieceType::King && piece.color() == color {
+                        #[allow(clippy::cast_possible_truncation)]
+                        return Some((x as u8, y as u8));
+                    }
+                }
+                None
+            });
+        });
+        // should this panic or simply return false? need to not panic if there are custom boards
+        let pos = pos.unwrap_or_else(|| panic!("unable to find {:?} king on board", color));
+
+        self.is_space_attacked(pos.0, pos.1, color)
+    }
 }
 
 impl Default for Board {
@@ -620,7 +647,14 @@ mod tests {
     fn pawn_can_en_passant() {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
-        let mut b = Board::make_custom(vec![(wp, 0, 1), (bp, 1, 3)], Color::White);
+
+        // add kings so is_in_check doesnt panic
+        let wk = Piece::new(PieceType::King, Color::White);
+        let bk = Piece::new(PieceType::King, Color::Black);
+        let mut b = Board::make_custom(
+            vec![(wp, 0, 1), (bp, 1, 3), (wk, 0, 4), (bk, 7, 4)],
+            Color::White,
+        );
         assert!(b.move_piece(0, 1, 0, 3));
         b.next_turn();
         assert!(b.move_piece(1, 3, 0, 2));
@@ -884,6 +918,18 @@ mod tests {
         assert!(b.move_piece(1, 3, 2, 4));
         assert_ne!(b, b2);
         b.undo_last_move();
+        assert_eq!(b, b2);
+    }
+
+    #[test]
+    fn prevent_move_exposing_check() {
+        let mut b = Board::new();
+        assert!(b.move_piece(4, 1, 4, 2));
+        assert!(b.move_piece(2, 6, 2, 5));
+        assert!(b.move_piece(4, 2, 4, 3));
+        assert!(b.move_piece(3, 7, 0, 4));
+        let b2 = b.clone();
+        assert!(!b.move_piece(3, 1, 3, 2)); // cannot move this pawn as it would expose king to check from queen
         assert_eq!(b, b2);
     }
 }

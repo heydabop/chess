@@ -1,7 +1,7 @@
 use crate::color::Color;
 use crate::piece::Piece;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Space {
     color: Color,
     piece: Option<Piece>,
