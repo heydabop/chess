@@ -70,6 +70,7 @@ fn game_loop(mut board: Board) -> Result<()> {
                     }
                 }
                 KeyCode::Char('z') => undoing = !undoing,
+                KeyCode::Char('q') => quitting = !quitting,
                 KeyCode::Char('y') => {
                     if undoing {
                         board.undo_last_move();
@@ -86,7 +87,10 @@ fn game_loop(mut board: Board) -> Result<()> {
                         return Ok(());
                     }
                 }
-                KeyCode::Char('q') => quitting = !quitting,
+                KeyCode::Char('n') => {
+                    quitting = false;
+                    undoing = false;
+                }
                 KeyCode::Char(' ') => {
                     if pos.0 > 7 || pos.1 > 7 {
                         continue;
