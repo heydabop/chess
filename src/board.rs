@@ -137,7 +137,7 @@ impl Board {
         self.turn_color
     }
 
-    pub fn next_turn(&mut self) {
+    fn toggle_turn(&mut self) {
         self.turn_color = match self.turn_color {
             Color::White => Color::Black,
             Color::Black => Color::White,
@@ -285,6 +285,7 @@ impl Board {
         ));
         piece.mark_moved();
         self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
+        self.toggle_turn();
 
         // undo this move if it has put the player in check
         if self.is_in_check(color) {
@@ -313,7 +314,7 @@ impl Board {
             let piece2 = last_move.take_captured_piece();
             self.spaces[y2 as usize][x2 as usize].set_piece(piece2);
         }
-        self.next_turn();
+        self.toggle_turn();
     }
 
     fn pawn_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
@@ -657,7 +658,6 @@ mod tests {
             Color::White,
         );
         assert!(b.move_piece(0, 1, 0, 3));
-        b.next_turn();
         assert!(b.move_piece(1, 3, 0, 2));
         assert!(b.space(0, 3).piece().is_none());
     }
@@ -904,8 +904,10 @@ mod tests {
         let b2 = Board::new();
         assert!(b.move_piece(1, 1, 1, 3));
         assert_ne!(b, b2);
+        assert_eq!(b.turn_color, Color::Black);
         b.undo_last_move();
         assert_eq!(b, b2);
+        assert_eq!(b.turn_color, Color::White);
     }
 
     #[test]
@@ -918,8 +920,10 @@ mod tests {
         assert!(b2.move_piece(2, 6, 2, 4));
         assert!(b.move_piece(1, 3, 2, 4));
         assert_ne!(b, b2);
+        assert_eq!(b.turn_color, Color::Black);
         b.undo_last_move();
         assert_eq!(b, b2);
+        assert_eq!(b.turn_color, Color::White);
     }
 
     #[test]

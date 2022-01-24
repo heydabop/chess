@@ -13,7 +13,7 @@ use std::io::{stdout, Stdout, Write};
 const SPACE_WIDTH: u16 = 5;
 const SPACE_HEIGHT: u16 = 3;
 const MIN_X: u16 = SPACE_WIDTH / 2;
-const MAX_X: u16 = SPACE_WIDTH * 7 - MIN_X;
+const MAX_X: u16 = SPACE_WIDTH * 7 + MIN_X;
 const MIN_Y: u16 = SPACE_HEIGHT / 2;
 const MAX_Y: u16 = SPACE_HEIGHT * 7 + MIN_Y;
 
@@ -139,7 +139,6 @@ impl Game {
                                 self.selected = None;
                             } else if x < 8 && y < 8 && self.board.move_piece(s.0, s.1, x, y) {
                                 self.selected = None;
-                                self.board.next_turn();
 
                                 self.queue_board()?;
                                 queue!(
