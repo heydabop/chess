@@ -188,6 +188,13 @@ impl Board {
                     piece.mark_moved();
                     self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
                     self.spaces[last_dest.1 as usize][last_dest.0 as usize].set_piece(None); // remove last_move pawn
+                    self.toggle_turn();
+
+                    // undo this move if it has put the player in check
+                    if self.is_in_check(color) {
+                        self.undo_last_move();
+                        return false;
+                    }
                     return true;
                 }
             }
@@ -252,6 +259,12 @@ impl Board {
                             let mut rook = self.spaces[y1 as usize][0].remove_piece().unwrap();
                             rook.mark_moved();
                             self.spaces[y1 as usize][3].set_piece(Some(rook));
+                        }
+                        self.toggle_turn();
+                        // undo this move if it has put the player in check (tho castling should check for this already)
+                        if self.is_in_check(color) {
+                            self.undo_last_move();
+                            return false;
                         }
                         return true;
                     }
