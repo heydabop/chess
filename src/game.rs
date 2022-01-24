@@ -257,12 +257,12 @@ impl Game {
 
 fn get_term_colors(space: &Space) -> (TermColor, TermColor) {
     let piece_color = match space.piece_color() {
-        Some(Color::White) => TermColor::Grey,
-        Some(Color::Black) => TermColor::DarkGrey,
+        Some(Color::White) => TermColor::Green,
+        Some(Color::Black) => TermColor::Red,
         None => TermColor::White,
     };
     let space_color = match space.color() {
-        Color::White => TermColor::White,
+        Color::White => TermColor::Grey,
         Color::Black => TermColor::Black,
     };
     (piece_color, space_color)
