@@ -132,7 +132,7 @@ impl Game {
                                 execute!(
                                     self.stdout,
                                     style::PrintStyledContent(
-                                        space.draw().with(colors.0).on(colors.1)
+                                        space.draw().with(colors.0).on_black()
                                     ),
                                     cursor::MoveLeft(1)
                                 )?;
@@ -201,29 +201,31 @@ impl Game {
         queue!(
             self.stdout,
             cursor::MoveTo(x, y),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
+            style::SetBackgroundColor(bg_color),
+            style::Print(' '),
+            style::Print(' '),
+            style::Print(' '),
+            style::Print(' '),
+            style::Print(' '),
             cursor::MoveTo(x, y + 1),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
+            style::Print(' '),
+            style::Print(' '),
             if highlighted {
-                style::PrintStyledContent(space.draw().with(fg_color).on_green())
+                style::PrintStyledContent(space.draw().black().on_green())
             } else if space.piece().is_some() {
                 style::PrintStyledContent(space.draw().with(fg_color).on_black())
             } else {
                 style::PrintStyledContent(space.draw().with(fg_color).on(bg_color))
             },
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
+            style::SetBackgroundColor(bg_color),
+            style::Print(' '),
+            style::Print(' '),
             cursor::MoveTo(x, y + 2),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
-            style::PrintStyledContent(' '.on(bg_color)),
+            style::Print(' '),
+            style::Print(' '),
+            style::Print(' '),
+            style::Print(' '),
+            style::Print(' '),
         )?;
 
         Ok(())
