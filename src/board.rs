@@ -154,6 +154,9 @@ impl Board {
         }
         let piece = piece.as_ref().unwrap();
         let color = piece.color();
+        if color != self.turn_color {
+            return false;
+        }
         let piece2 = self.space(x2, y2).piece();
 
         // Check and execute en passant here since piece removal from capture is different than normal
