@@ -86,7 +86,7 @@ impl Game {
                             execute!(self.stdout, cursor::MoveRight(SPACE_WIDTH))?;
                         }
                     }
-                    KeyCode::Char('z') | KeyCode::Char('u') => {
+                    KeyCode::Char('z' | 'u') => {
                         self.undoing = true;
                         self.quitting = false;
                         self.queue_status_text()?;

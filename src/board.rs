@@ -334,12 +334,16 @@ impl Board {
             self.spaces[y2 as usize][x2 as usize].set_piece(piece2);
         } else if is_castle {
             // move rook as well
-            let (rook_x1, rook_x2) = if x1 < x2 { (7, x2 - 1) } else { (0, x2 + 1) };
+            let (rook_x1, rook_x2) = if x1 < x2 {
+                (7usize, x2 - 1)
+            } else {
+                (0usize, x2 + 1)
+            };
             let mut rook = self.spaces[y2 as usize][rook_x2 as usize]
                 .remove_piece()
                 .unwrap();
             rook.unmark_moved(); // can only castle if rook was unmoved, reset this
-            self.spaces[y1 as usize][rook_x1 as usize].set_piece(Some(rook));
+            self.spaces[y1 as usize][rook_x1].set_piece(Some(rook));
         }
         self.toggle_turn();
     }
