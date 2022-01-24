@@ -312,6 +312,22 @@ impl Board {
         true
     }
 
+    pub fn promote_pawn(&mut self, x: u8, y: u8, piece_type: PieceType) {
+        let piece = self.spaces[y as usize][x as usize]
+            .remove_piece()
+            .expect("promote called on space without piece");
+        assert_eq!(
+            piece.piece_type(),
+            PieceType::Pawn,
+            "promote called on non-pawn"
+        );
+        assert!(
+            (piece.color() == Color::White && y == 7) || (piece.color() == Color::Black && y == 0),
+            "promote called on ineligible pawn"
+        );
+        self.spaces[y as usize][x as usize].set_piece(Some(Piece::new(piece_type, piece.color())));
+    }
+
     pub fn undo_last_move(&mut self) {
         if self.moves.is_empty() {
             return;
@@ -989,6 +1005,19 @@ mod tests {
         assert!(b.move_piece(3, 7, 0, 4));
         let b2 = b.clone();
         assert!(!b.move_piece(3, 1, 3, 2)); // cannot move this pawn as it would expose king to check from queen
+        assert_eq!(b, b2);
+    }
+
+    #[test]
+    fn promote() {
+        let wp = Piece::new(PieceType::Pawn, Color::White);
+        let bp = Piece::new(PieceType::Pawn, Color::Black);
+        let mut b = Board::make_custom(vec![(wp, 0, 7), (bp, 0, 0)], Color::White);
+        let wb = Piece::new(PieceType::Bishop, Color::White);
+        let br = Piece::new(PieceType::Rook, Color::Black);
+        let mut b2 = Board::make_custom(vec![(wb, 0, 7), (br, 0, 0)], Color::White);
+        b.promote_pawn(0, 7, PieceType::Bishop);
+        b.promote_pawn(0, 0, PieceType::Rook);
         assert_eq!(b, b2);
     }
 }

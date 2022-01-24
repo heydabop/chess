@@ -1,5 +1,6 @@
 use crate::board::Board;
 use crate::color::Color;
+use crate::piece::PieceType;
 use crate::space::Space;
 use crossterm::{
     cursor,
@@ -22,6 +23,7 @@ pub struct Game {
     selected: Option<(u8, u8)>,
     undoing: bool,
     quitting: bool,
+    promoting: Option<(u8, u8)>,
     stdout: Stdout,
 }
 
@@ -32,6 +34,7 @@ impl Game {
             selected: None,
             undoing: false,
             quitting: false,
+            promoting: None,
             stdout: stdout(),
         }
     }
@@ -42,6 +45,7 @@ impl Game {
             selected: None,
             undoing: false,
             quitting: false,
+            promoting: None,
             stdout: stdout(),
         }
     }
@@ -67,23 +71,45 @@ impl Game {
                 let pos = cursor::position()?;
                 match k.code {
                     KeyCode::Up => {
-                        if pos.1 > MIN_Y {
+                        if self.promoting.is_none() && pos.1 > MIN_Y {
                             execute!(self.stdout, cursor::MoveUp(SPACE_HEIGHT))?;
                         }
                     }
                     KeyCode::Down => {
-                        if pos.1 < MAX_Y {
+                        if self.promoting.is_none() && pos.1 < MAX_Y {
                             execute!(self.stdout, cursor::MoveDown(SPACE_HEIGHT))?;
                         }
                     }
                     KeyCode::Left => {
-                        if pos.0 > MIN_X {
+                        if self.promoting.is_none() && pos.0 > MIN_X {
                             execute!(self.stdout, cursor::MoveLeft(SPACE_WIDTH))?;
                         }
                     }
                     KeyCode::Right => {
-                        if pos.0 < MAX_X {
+                        if self.promoting.is_none() && pos.0 < MAX_X {
                             execute!(self.stdout, cursor::MoveRight(SPACE_WIDTH))?;
+                        }
+                    }
+                    KeyCode::Char('b') => {
+                        if let Some(promoting) = self.promoting {
+                            self.board
+                                .promote_pawn(promoting.0, promoting.1, PieceType::Bishop);
+                            self.promoting = None;
+                            self.queue_board()?;
+                            self.queue_status_text()?;
+                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                            self.stdout.flush()?;
+                        }
+                    }
+                    KeyCode::Char('r') => {
+                        if let Some(promoting) = self.promoting {
+                            self.board
+                                .promote_pawn(promoting.0, promoting.1, PieceType::Rook);
+                            self.promoting = None;
+                            self.queue_board()?;
+                            self.queue_status_text()?;
+                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                            self.stdout.flush()?;
                         }
                     }
                     KeyCode::Char('z' | 'u') => {
@@ -93,14 +119,25 @@ impl Game {
                         self.stdout.flush()?;
                     }
                     KeyCode::Char('q') => {
-                        self.quitting = true;
-                        self.undoing = false;
-                        self.queue_status_text()?;
-                        self.stdout.flush()?;
+                        if let Some(promoting) = self.promoting {
+                            self.board
+                                .promote_pawn(promoting.0, promoting.1, PieceType::Queen);
+                            self.promoting = None;
+                            self.queue_board()?;
+                            self.queue_status_text()?;
+                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                            self.stdout.flush()?;
+                        } else {
+                            self.quitting = true;
+                            self.undoing = false;
+                            self.queue_status_text()?;
+                            self.stdout.flush()?;
+                        }
                     }
                     KeyCode::Char('y') => {
                         if self.undoing {
                             self.selected = None;
+                            self.promoting = None;
                             self.board.undo_last_move();
                             self.undoing = false;
                             self.queue_board()?;
@@ -113,10 +150,23 @@ impl Game {
                         }
                     }
                     KeyCode::Char('n') => {
-                        self.quitting = false;
-                        self.undoing = false;
-                        self.queue_status_text()?;
-                        self.stdout.flush()?;
+                        if self.undoing {
+                            self.undoing = false;
+                            self.queue_status_text()?;
+                            self.stdout.flush()?;
+                        } else if self.quitting {
+                            self.quitting = false;
+                            self.queue_status_text()?;
+                            self.stdout.flush()?;
+                        } else if let Some(promoting) = self.promoting {
+                            self.board
+                                .promote_pawn(promoting.0, promoting.1, PieceType::Knight);
+                            self.promoting = None;
+                            self.queue_board()?;
+                            self.queue_status_text()?;
+                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                            self.stdout.flush()?;
+                        }
                     }
                     KeyCode::Esc => {
                         if self.selected.is_some() {
@@ -137,6 +187,9 @@ impl Game {
                         }
                     }
                     KeyCode::Char(' ') => {
+                        if self.promoting.is_some() {
+                            continue;
+                        }
                         self.quitting = false;
                         self.undoing = false;
                         if pos.0 > MAX_X || pos.1 > MAX_Y {
@@ -160,6 +213,17 @@ impl Game {
                                 self.selected = None;
                             } else if x < 8 && y < 8 && self.board.move_piece(s.0, s.1, x, y) {
                                 self.selected = None;
+                                self.promoting = {
+                                    let piece = self.board.space(x, y).piece().as_ref().unwrap();
+                                    if piece.piece_type() == PieceType::Pawn
+                                        && ((piece.color() == Color::White && y == 7)
+                                            || (piece.color() == Color::Black && y == 0))
+                                    {
+                                        Some((x, y))
+                                    } else {
+                                        None
+                                    }
+                                };
 
                                 self.queue_board()?;
                                 queue!(
@@ -256,13 +320,15 @@ impl Game {
         let pos = cursor::position()?;
 
         let (status, color) = if self.quitting {
-            ("QUIT? (y/n)", TermColor::Magenta)
+            ("QUIT? (y/n)                ", TermColor::Magenta)
         } else if self.undoing {
-            ("UNDO? (y/n)", TermColor::Magenta)
+            ("UNDO? (y/n)                ", TermColor::Magenta)
+        } else if self.promoting.is_some() {
+            ("SELECT PROMOTION: (q/r/b/n)", TermColor::Magenta)
         } else {
             match self.board.turn_color() {
-                Color::White => ("WHITE      ", TermColor::Green),
-                Color::Black => ("BLACK      ", TermColor::Red),
+                Color::White => ("WHITE                      ", TermColor::Green),
+                Color::Black => ("BLACK                      ", TermColor::Red),
             }
         };
 
@@ -274,6 +340,12 @@ impl Game {
         )?;
 
         Ok(())
+    }
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        Game::new()
     }
 }
 
