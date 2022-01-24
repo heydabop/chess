@@ -100,6 +100,7 @@ impl Game {
                     }
                     KeyCode::Char('y') => {
                         if self.undoing {
+                            self.selected = None;
                             self.board.undo_last_move();
                             self.undoing = false;
                             self.queue_board()?;
@@ -117,7 +118,27 @@ impl Game {
                         self.queue_status_text()?;
                         self.stdout.flush()?;
                     }
+                    KeyCode::Esc => {
+                        if self.selected.is_some() {
+                            self.selected = None;
+                            self.queue_board()?;
+                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                            self.stdout.flush()?;
+                        }
+                        if self.quitting {
+                            self.quitting = false;
+                            self.queue_status_text()?;
+                            self.stdout.flush()?;
+                        }
+                        if self.undoing {
+                            self.undoing = false;
+                            self.queue_status_text()?;
+                            self.stdout.flush()?;
+                        }
+                    }
                     KeyCode::Char(' ') => {
+                        self.quitting = false;
+                        self.undoing = false;
                         if pos.0 > MAX_X || pos.1 > MAX_Y {
                             continue;
                         }
@@ -234,21 +255,21 @@ impl Game {
     fn queue_status_text(&mut self) -> Result<()> {
         let pos = cursor::position()?;
 
-        let status = if self.quitting {
-            "QUIT? (y/n)"
+        let (status, color) = if self.quitting {
+            ("QUIT? (y/n)", TermColor::Magenta)
         } else if self.undoing {
-            "UNDO? (y/n)"
+            ("UNDO? (y/n)", TermColor::Magenta)
         } else {
             match self.board.turn_color() {
-                Color::White => "WHITE      ",
-                Color::Black => "BLACK      ",
+                Color::White => ("WHITE      ", TermColor::Green),
+                Color::Black => ("BLACK      ", TermColor::Red),
             }
         };
 
         queue!(
             self.stdout,
             cursor::MoveTo(1, SPACE_HEIGHT * 8 + 1),
-            style::PrintStyledContent(status.on_black()),
+            style::PrintStyledContent(status.with(color).on_black()),
             cursor::MoveTo(pos.0, pos.1),
         )?;
 
