@@ -8,7 +8,7 @@ use crossterm::{
     style::{self, Color as TermColor, Stylize},
     terminal, Result,
 };
-use std::io::{stdout, Write};
+use std::io::{stdout, Stdout, Write};
 
 const SPACE_WIDTH: u16 = 5;
 const SPACE_HEIGHT: u16 = 3;
@@ -22,6 +22,7 @@ pub struct Game {
     selected: Option<(u8, u8)>,
     undoing: bool,
     quitting: bool,
+    stdout: Stdout,
 }
 
 impl Game {
@@ -31,6 +32,7 @@ impl Game {
             selected: None,
             undoing: false,
             quitting: false,
+            stdout: stdout(),
         }
     }
 
@@ -40,23 +42,23 @@ impl Game {
             selected: None,
             undoing: false,
             quitting: false,
+            stdout: stdout(),
         }
     }
 
     pub fn run_loop(&mut self) -> Result<()> {
-        let mut stdout = stdout();
-
-        queue!(stdout, terminal::Clear(terminal::ClearType::All))?;
+        queue!(self.stdout, terminal::Clear(terminal::ClearType::All))?;
         self.queue_board()?;
         queue!(
-            stdout,
+            self.stdout,
             cursor::MoveLeft(1),
             cursor::SetCursorShape(cursor::CursorShape::Block),
             cursor::EnableBlinking,
             cursor::Show,
             cursor::MoveTo(SPACE_WIDTH / 2, SPACE_HEIGHT * 7 + SPACE_HEIGHT / 2),
         )?;
-        stdout.flush()?;
+        self.queue_status_text()?;
+        self.stdout.flush()?;
         terminal::enable_raw_mode()?;
 
         loop {
@@ -66,43 +68,44 @@ impl Game {
                 match k.code {
                     KeyCode::Up => {
                         if pos.1 > MIN_Y {
-                            execute!(stdout, cursor::MoveUp(SPACE_HEIGHT))?;
+                            execute!(self.stdout, cursor::MoveUp(SPACE_HEIGHT))?;
                         }
                     }
                     KeyCode::Down => {
                         if pos.1 < MAX_Y {
-                            execute!(stdout, cursor::MoveDown(SPACE_HEIGHT))?;
+                            execute!(self.stdout, cursor::MoveDown(SPACE_HEIGHT))?;
                         }
                     }
                     KeyCode::Left => {
                         if pos.0 > MIN_X {
-                            execute!(stdout, cursor::MoveLeft(SPACE_WIDTH))?;
+                            execute!(self.stdout, cursor::MoveLeft(SPACE_WIDTH))?;
                         }
                     }
                     KeyCode::Right => {
                         if pos.0 < MAX_X {
-                            execute!(stdout, cursor::MoveRight(SPACE_WIDTH))?;
+                            execute!(self.stdout, cursor::MoveRight(SPACE_WIDTH))?;
                         }
                     }
-                    KeyCode::Char('z') => {
+                    KeyCode::Char('z') | KeyCode::Char('u') => {
                         self.undoing = true;
                         self.quitting = false;
+                        self.queue_status_text()?;
+                        self.stdout.flush()?;
                     }
                     KeyCode::Char('q') => {
                         self.quitting = true;
                         self.undoing = false;
+                        self.queue_status_text()?;
+                        self.stdout.flush()?;
                     }
                     KeyCode::Char('y') => {
                         if self.undoing {
                             self.board.undo_last_move();
                             self.undoing = false;
                             self.queue_board()?;
-                            #[allow(clippy::cast_possible_truncation)]
-                            let x = pos.0 as u8;
-                            #[allow(clippy::cast_possible_truncation)]
-                            let y = (7 - pos.1) as u8;
-                            queue!(stdout, cursor::MoveTo(x.into(), (7 - y).into()))?;
-                            stdout.flush()?;
+                            self.queue_status_text()?;
+                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                            self.stdout.flush()?;
                         }
                         if self.quitting {
                             break;
@@ -111,6 +114,8 @@ impl Game {
                     KeyCode::Char('n') => {
                         self.quitting = false;
                         self.undoing = false;
+                        self.queue_status_text()?;
+                        self.stdout.flush()?;
                     }
                     KeyCode::Char(' ') => {
                         if pos.0 > MAX_X || pos.1 > MAX_Y {
@@ -125,7 +130,7 @@ impl Game {
                                 let space = self.board.space(x, y);
                                 let colors = get_term_colors(space);
                                 execute!(
-                                    stdout,
+                                    self.stdout,
                                     style::PrintStyledContent(
                                         space.draw().with(colors.0).on(colors.1)
                                     ),
@@ -138,13 +143,14 @@ impl Game {
 
                                 self.queue_board()?;
                                 queue!(
-                                    stdout,
+                                    self.stdout,
                                     cursor::MoveTo(
                                         u16::from(x) * SPACE_WIDTH + (SPACE_WIDTH / 2),
                                         (7 - u16::from(y)) * SPACE_HEIGHT + (SPACE_HEIGHT / 2)
                                     )
                                 )?;
-                                stdout.flush()?;
+                                self.queue_status_text()?;
+                                self.stdout.flush()?;
                             }
                         } else if x < 8 && y < 8 {
                             let space = self.board.space(x, y);
@@ -153,11 +159,11 @@ impl Game {
                                     self.selected = Some((x, y));
                                     self.queue_space(x, y)?;
                                     queue!(
-                                        stdout,
+                                        self.stdout,
                                         cursor::MoveUp(MIN_Y),
                                         cursor::MoveLeft(MIN_X + 1)
                                     )?;
-                                    stdout.flush()?;
+                                    self.stdout.flush()?;
                                 }
                             }
                         }
@@ -168,7 +174,7 @@ impl Game {
         }
 
         terminal::disable_raw_mode()?;
-        execute!(stdout, cursor::MoveTo(0, 0))?;
+        execute!(self.stdout, cursor::MoveTo(0, 0))?;
 
         Ok(())
     }
@@ -183,7 +189,7 @@ impl Game {
         Ok(())
     }
 
-    fn queue_space(&self, space_x: u8, space_y: u8) -> Result<()> {
+    fn queue_space(&mut self, space_x: u8, space_y: u8) -> Result<()> {
         let space = self.board.space(space_x, space_y);
         let highlighted = if let Some(selected) = self.selected {
             selected.0 == space_x && selected.1 == space_y
@@ -192,10 +198,9 @@ impl Game {
         };
         let x = u16::from(space_x) * SPACE_WIDTH;
         let y = (7 - u16::from(space_y)) * SPACE_HEIGHT;
-        let mut stdout = stdout();
         let (fg_color, bg_color) = get_term_colors(space);
         queue!(
-            stdout,
+            self.stdout,
             cursor::MoveTo(x, y),
             style::PrintStyledContent(' '.on(bg_color)),
             style::PrintStyledContent(' '.on(bg_color)),
@@ -220,6 +225,30 @@ impl Game {
             style::PrintStyledContent(' '.on(bg_color)),
             style::PrintStyledContent(' '.on(bg_color)),
             style::PrintStyledContent(' '.on(bg_color)),
+        )?;
+
+        Ok(())
+    }
+
+    fn queue_status_text(&mut self) -> Result<()> {
+        let pos = cursor::position()?;
+
+        let status = if self.quitting {
+            "QUIT? (y/n)"
+        } else if self.undoing {
+            "UNDO? (y/n)"
+        } else {
+            match self.board.turn_color() {
+                Color::White => "WHITE      ",
+                Color::Black => "BLACK      ",
+            }
+        };
+
+        queue!(
+            self.stdout,
+            cursor::MoveTo(1, SPACE_HEIGHT * 8 + 1),
+            style::PrintStyledContent(status.on_black()),
+            cursor::MoveTo(pos.0, pos.1),
         )?;
 
         Ok(())

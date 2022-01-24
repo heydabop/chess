@@ -313,6 +313,7 @@ impl Board {
             let piece2 = last_move.take_captured_piece();
             self.spaces[y2 as usize][x2 as usize].set_piece(piece2);
         }
+        self.next_turn();
     }
 
     fn pawn_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
