@@ -322,6 +322,9 @@ impl Board {
         let mut piece = self.spaces[y2 as usize][x2 as usize]
             .remove_piece()
             .unwrap();
+        let is_castle = piece.piece_type() == PieceType::King
+            && y1 == y2
+            && (i16::from(x1) - i16::from(x2)).abs() == 2;
         if last_move.first_move() {
             piece.unmark_moved();
         }
@@ -329,6 +332,14 @@ impl Board {
         if last_move.is_capture() {
             let piece2 = last_move.take_captured_piece();
             self.spaces[y2 as usize][x2 as usize].set_piece(piece2);
+        } else if is_castle {
+            // move rook as well
+            let (rook_x1, rook_x2) = if x1 < x2 { (7, x2 - 1) } else { (0, x2 + 1) };
+            let mut rook = self.spaces[y2 as usize][rook_x2 as usize]
+                .remove_piece()
+                .unwrap();
+            rook.unmark_moved(); // can only castle if rook was unmoved, reset this
+            self.spaces[y1 as usize][rook_x1 as usize].set_piece(Some(rook));
         }
         self.toggle_turn();
     }
@@ -848,7 +859,7 @@ mod tests {
         );
         let bk = Piece::new(PieceType::King, Color::Black);
         let br = Piece::new(PieceType::Rook, Color::Black);
-        let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 0, 7)], Color::White);
+        let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 0, 7)], Color::Black);
         assert!(b.move_piece(4, 7, 2, 7));
         assert_eq!(
             b.space(2, 7).piece().as_ref().unwrap().piece_type(),
@@ -876,7 +887,7 @@ mod tests {
         );
         let bk = Piece::new(PieceType::King, Color::Black);
         let br = Piece::new(PieceType::Rook, Color::Black);
-        let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 7, 7)], Color::White);
+        let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 7, 7)], Color::Black);
         assert!(b.move_piece(4, 7, 6, 7));
         assert_eq!(
             b.space(6, 7).piece().as_ref().unwrap().piece_type(),
@@ -940,6 +951,29 @@ mod tests {
         b.undo_last_move();
         assert_eq!(b, b2);
         assert_eq!(b.turn_color, Color::White);
+    }
+
+    #[test]
+    fn undo_castle() {
+        let wk = Piece::new(PieceType::King, Color::White);
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let mut b = Board::make_custom(vec![(wk, 4, 0), (wr, 7, 0)], Color::White);
+        let b2 = b.clone();
+        assert!(b.move_piece(4, 0, 6, 0));
+        assert_eq!(b.turn_color, Color::Black);
+        b.undo_last_move();
+        assert_eq!(b, b2);
+        assert_eq!(b.turn_color, Color::White);
+
+        let bk = Piece::new(PieceType::King, Color::Black);
+        let br = Piece::new(PieceType::Rook, Color::Black);
+        let mut b = Board::make_custom(vec![(bk, 4, 7), (br, 0, 7)], Color::Black);
+        let b2 = b.clone();
+        assert!(b.move_piece(4, 7, 2, 7));
+        assert_eq!(b.turn_color, Color::White);
+        b.undo_last_move();
+        assert_eq!(b, b2);
+        assert_eq!(b.turn_color, Color::Black);
     }
 
     #[test]
