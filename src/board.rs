@@ -3,12 +3,15 @@ use crate::move_record::MoveRecord;
 use crate::piece::{Piece, PieceType};
 use crate::space::Space;
 use std::array::from_fn;
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Board {
     spaces: [[Space; 8]; 8],
     turn_color: Color,
     moves: Vec<MoveRecord>,
+    captured_by_white: HashMap<PieceType, u8>,
+    captured_by_black: HashMap<PieceType, u8>,
 }
 
 impl Board {
@@ -48,6 +51,8 @@ impl Board {
             }),
             turn_color: Color::White,
             moves: vec![],
+            captured_by_white: HashMap::new(),
+            captured_by_black: HashMap::new(),
         }
     }
 
@@ -70,6 +75,8 @@ impl Board {
             spaces,
             turn_color: starting_color,
             moves: vec![],
+            captured_by_white: HashMap::new(),
+            captured_by_black: HashMap::new(),
         }
     }
 
@@ -122,6 +129,8 @@ impl Board {
             spaces,
             turn_color,
             moves: vec![],
+            captured_by_white: HashMap::new(),
+            captured_by_black: HashMap::new(),
         }
     }
 
@@ -178,19 +187,21 @@ impl Board {
                     let mut piece = self.spaces[y1 as usize][x1 as usize]
                         .remove_piece()
                         .unwrap();
-                    let piece2 = self.spaces[y2 as usize][x2 as usize].remove_piece();
+                    let piece2 = self.spaces[last_dest.1 as usize][last_dest.0 as usize]
+                        .remove_piece()
+                        .unwrap(); //get and remove last_move pawn
+                    self.record_capture_by(piece.color(), piece2.piece_type());
                     self.moves.push(MoveRecord::new(
                         x1,
                         y1,
                         x2,
                         y2,
-                        piece2,
+                        Some(piece2),
                         piece.piece_type(),
                         !piece.has_moved(),
                     ));
                     piece.mark_moved();
                     self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
-                    self.spaces[last_dest.1 as usize][last_dest.0 as usize].set_piece(None); // remove last_move pawn
                     self.toggle_turn();
 
                     // undo this move if it has put the player in check
@@ -242,13 +253,12 @@ impl Board {
                         let mut piece = self.spaces[y1 as usize][x1 as usize]
                             .remove_piece()
                             .unwrap();
-                        let piece2 = self.spaces[y2 as usize][x2 as usize].remove_piece();
                         self.moves.push(MoveRecord::new(
                             x1,
                             y1,
                             x2,
                             y2,
-                            piece2,
+                            None,
                             piece.piece_type(),
                             !piece.has_moved(),
                         ));
@@ -290,6 +300,9 @@ impl Board {
             .remove_piece()
             .unwrap();
         let piece2 = self.spaces[y2 as usize][x2 as usize].remove_piece();
+        if let Some(piece2) = &piece2 {
+            self.record_capture_by(piece.color(), piece2.piece_type());
+        }
         self.moves.push(MoveRecord::new(
             x1,
             y1,
@@ -344,10 +357,23 @@ impl Board {
         if last_move.first_move() {
             piece.unmark_moved();
         }
-        self.spaces[y1 as usize][x1 as usize].set_piece(Some(piece));
         if last_move.is_capture() {
-            let piece2 = last_move.take_captured_piece();
-            self.spaces[y2 as usize][x2 as usize].set_piece(piece2);
+            let piece2 = last_move
+                .take_captured_piece()
+                .expect("expected target piece when undoing last capture");
+            if let Some(captures) = match piece.color() {
+                Color::White => self.captured_by_white.get_mut(&piece2.piece_type()),
+                Color::Black => self.captured_by_black.get_mut(&piece2.piece_type()),
+            } {
+                *captures -= 1;
+                if *captures == 0 {
+                    match piece.color() {
+                        Color::White => self.captured_by_white.remove(&piece2.piece_type()),
+                        Color::Black => self.captured_by_black.remove(&piece2.piece_type()),
+                    };
+                }
+            }
+            self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece2));
         } else if is_castle {
             // move rook as well
             let (rook_x1, rook_x2) = if x1 < x2 {
@@ -361,7 +387,22 @@ impl Board {
             rook.unmark_moved(); // can only castle if rook was unmoved, reset this
             self.spaces[y1 as usize][rook_x1].set_piece(Some(rook));
         }
+        self.spaces[y1 as usize][x1 as usize].set_piece(Some(piece));
         self.toggle_turn();
+    }
+
+    fn record_capture_by(&mut self, color: Color, captured_piece_type: PieceType) {
+        let count = match color {
+            Color::White => self
+                .captured_by_white
+                .entry(captured_piece_type)
+                .or_insert(0),
+            Color::Black => self
+                .captured_by_black
+                .entry(captured_piece_type)
+                .or_insert(0),
+        };
+        *count += 1;
     }
 
     fn pawn_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
@@ -1015,9 +1056,49 @@ mod tests {
         let mut b = Board::make_custom(vec![(wp, 0, 7), (bp, 0, 0)], Color::White);
         let wb = Piece::new(PieceType::Bishop, Color::White);
         let br = Piece::new(PieceType::Rook, Color::Black);
-        let mut b2 = Board::make_custom(vec![(wb, 0, 7), (br, 0, 0)], Color::White);
+        let b2 = Board::make_custom(vec![(wb, 0, 7), (br, 0, 0)], Color::White);
         b.promote_pawn(0, 7, PieceType::Bishop);
         b.promote_pawn(0, 0, PieceType::Rook);
         assert_eq!(b, b2);
+    }
+
+    #[test]
+    fn record_capture() {
+        let wr = Piece::new(PieceType::Rook, Color::White);
+        let br = Piece::new(PieceType::Rook, Color::Black);
+        let wp = Piece::new(PieceType::Pawn, Color::White);
+        let bp = Piece::new(PieceType::Pawn, Color::Black);
+        // add kings so is_in_check doesnt panic
+        let wk = Piece::new(PieceType::King, Color::White);
+        let bk = Piece::new(PieceType::King, Color::Black);
+        let mut b = Board::make_custom(
+            vec![
+                (wr, 0, 0),
+                (br, 2, 1),
+                (wp, 1, 1),
+                (bp.clone(), 0, 1),
+                (bp, 1, 4),
+                (wk, 7, 7),
+                (bk, 5, 7),
+            ],
+            Color::White,
+        );
+        assert!(b.captured_by_white.is_empty());
+        assert!(b.captured_by_black.is_empty());
+        assert!(b.move_piece(0, 0, 0, 1));
+        assert_eq!(b.captured_by_white.get(&PieceType::Pawn).unwrap(), &1);
+        assert!(b.captured_by_black.is_empty());
+        assert!(b.move_piece(2, 1, 1, 1));
+        assert_eq!(b.captured_by_black.get(&PieceType::Pawn).unwrap(), &1);
+        assert!(b.move_piece(0, 1, 1, 1));
+        assert_eq!(b.captured_by_white.get(&PieceType::Rook).unwrap(), &1);
+        assert!(b.move_piece(1, 4, 1, 3));
+        assert!(b.move_piece(1, 1, 1, 3));
+        assert_eq!(b.captured_by_white.get(&PieceType::Pawn).unwrap(), &2);
+        b.undo_last_move();
+        assert_eq!(b.captured_by_white.get(&PieceType::Pawn).unwrap(), &1);
+        b.undo_last_move();
+        b.undo_last_move();
+        assert!(!b.captured_by_white.contains_key(&PieceType::Rook));
     }
 }
