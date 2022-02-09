@@ -391,6 +391,14 @@ impl Board {
         self.toggle_turn();
     }
 
+    pub fn captured_by_white(&self) -> &HashMap<PieceType, u8> {
+        &self.captured_by_white
+    }
+
+    pub fn captured_by_black(&self) -> &HashMap<PieceType, u8> {
+        &self.captured_by_black
+    }
+
     fn record_capture_by(&mut self, color: Color, captured_piece_type: PieceType) {
         let count = match color {
             Color::White => self

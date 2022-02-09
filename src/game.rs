@@ -9,6 +9,7 @@ use crossterm::{
     style::{self, Color as TermColor, Stylize},
     terminal, Result,
 };
+use std::collections::HashMap;
 use std::io::{stdout, Stdout, Write};
 
 const SPACE_WIDTH: u16 = 5;
@@ -141,6 +142,7 @@ impl Game {
                             self.board.undo_last_move();
                             self.undoing = false;
                             self.queue_board()?;
+                            self.queue_captured_pieces()?;
                             self.queue_status_text()?;
                             queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
                             self.stdout.flush()?;
@@ -226,6 +228,7 @@ impl Game {
                                 };
 
                                 self.queue_board()?;
+                                self.queue_captured_pieces()?;
                                 queue!(
                                     self.stdout,
                                     cursor::MoveTo(
@@ -339,6 +342,69 @@ impl Game {
             cursor::MoveTo(pos.0, pos.1),
         )?;
 
+        Ok(())
+    }
+
+    fn queue_captured_pieces(&mut self) -> Result<()> {
+        let pos = cursor::position()?;
+
+        let white = self.board.captured_by_white().clone();
+        let black = self.board.captured_by_black().clone();
+
+        queue!(
+            self.stdout,
+            cursor::MoveTo(SPACE_WIDTH * 8 + SPACE_WIDTH / 2, 1),
+            style::SetForegroundColor(TermColor::Green),
+            style::SetBackgroundColor(TermColor::Black),
+        )?;
+
+        self.queue_captured_row(&black, PieceType::Queen, false)?;
+        self.queue_captured_row(&black, PieceType::Rook, false)?;
+        self.queue_captured_row(&black, PieceType::Bishop, false)?;
+        self.queue_captured_row(&black, PieceType::Knight, false)?;
+        self.queue_captured_row(&black, PieceType::Pawn, false)?;
+
+        queue!(
+            self.stdout,
+            cursor::MoveTo(SPACE_WIDTH * 8 + SPACE_WIDTH / 2, SPACE_HEIGHT * 8 - 1),
+            style::SetForegroundColor(TermColor::Red),
+        )?;
+
+        self.queue_captured_row(&white, PieceType::Pawn, true)?;
+        self.queue_captured_row(&white, PieceType::Knight, true)?;
+        self.queue_captured_row(&white, PieceType::Bishop, true)?;
+        self.queue_captured_row(&white, PieceType::Rook, true)?;
+        self.queue_captured_row(&white, PieceType::Queen, true)?;
+
+        queue!(self.stdout, cursor::MoveTo(pos.0, pos.1), style::ResetColor)?;
+
+        Ok(())
+    }
+
+    fn queue_captured_row(
+        &mut self,
+        pieces: &HashMap<PieceType, u8>,
+        piece_type: PieceType,
+        reverse: bool,
+    ) -> Result<()> {
+        let s = match piece_type {
+            PieceType::Queen => "Q ",
+            PieceType::Rook => "R ",
+            PieceType::Bishop => "B ",
+            PieceType::Knight => "N ",
+            PieceType::Pawn => "P ",
+            PieceType::King => "K ",
+        };
+        if pieces.contains_key(&piece_type) {
+            let count = u16::from(*pieces.get(&piece_type).unwrap());
+            queue!(self.stdout, style::Print(s.repeat(count as usize)),)?;
+            if reverse {
+                queue!(self.stdout, cursor::MoveUp(1))?;
+            } else {
+                queue!(self.stdout, cursor::MoveDown(1))?;
+            }
+            queue!(self.stdout, cursor::MoveLeft(count * 2))?;
+        }
         Ok(())
     }
 }
