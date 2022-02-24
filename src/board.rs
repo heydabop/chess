@@ -408,16 +408,17 @@ impl Board {
             for y0 in 0..8 {
                 if let Some(piece) = self.space(x0, y0).piece() {
                     if piece.color() == color {
+                        // this clone and trying EVERY space could probably be improved
                         let mut new_board = self.clone();
                         for x1 in 0..8 {
                             for y1 in 0..8 {
-                                if x0 != x1 && y0 != y1 {
-                                    if new_board.move_piece(x0, y0, x1, y1) {
-                                        if !new_board.is_in_check(color) {
-                                            // color would no longer be in check if this move were made
-                                            return false;
-                                        }
-                                    }
+                                if x0 != x1
+                                    && y0 != y1
+                                    && new_board.move_piece(x0, y0, x1, y1)
+                                    && !new_board.is_in_check(color)
+                                {
+                                    // color would no longer be in check if this move were made
+                                    return false;
                                 }
                             }
                         }
@@ -426,7 +427,7 @@ impl Board {
             }
         }
         // color was in check after exhausting all possible moves
-        return true;
+        true
     }
 
     fn record_capture_by(&mut self, color: Color, captured_piece_type: PieceType) {
