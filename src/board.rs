@@ -399,6 +399,36 @@ impl Board {
         &self.captured_by_black
     }
 
+    pub fn is_in_checkmate(&self, color: Color) -> bool {
+        if !self.is_in_check(color) {
+            return false;
+        }
+        // iterate through every piece of matching color and naively move each one to any valid space and see if check remains
+        for x0 in 0..8 {
+            for y0 in 0..8 {
+                if let Some(piece) = self.space(x0, y0).piece() {
+                    if piece.color() == color {
+                        let mut new_board = self.clone();
+                        for x1 in 0..8 {
+                            for y1 in 0..8 {
+                                if x0 != x1 && y0 != y1 {
+                                    if new_board.move_piece(x0, y0, x1, y1) {
+                                        if !new_board.is_in_check(color) {
+                                            // color would no longer be in check if this move were made
+                                            return false;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // color was in check after exhausting all possible moves
+        return true;
+    }
+
     fn record_capture_by(&mut self, color: Color, captured_piece_type: PieceType) {
         let count = match color {
             Color::White => self
@@ -1108,5 +1138,19 @@ mod tests {
         b.undo_last_move();
         b.undo_last_move();
         assert!(!b.captured_by_white.contains_key(&PieceType::Rook));
+    }
+
+    #[test]
+    fn four_move_checkmate() {
+        let mut b = Board::new();
+        assert!(b.move_piece(4, 1, 4, 3));
+        assert!(b.move_piece(0, 6, 0, 5));
+        assert!(b.move_piece(5, 0, 2, 3));
+        assert!(b.move_piece(0, 5, 0, 4));
+        assert!(b.move_piece(3, 0, 7, 4));
+        assert!(b.move_piece(0, 4, 0, 3));
+        assert!(!b.is_in_checkmate(Color::Black));
+        assert!(b.move_piece(7, 4, 5, 6));
+        assert!(b.is_in_checkmate(Color::Black));
     }
 }
