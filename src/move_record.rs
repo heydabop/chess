@@ -7,6 +7,7 @@ pub struct MoveRecord {
     capture: Option<Piece>,
     piece_type: PieceType,
     first_move: bool, // true if this was the piece's first move
+    promotion: bool,
 }
 
 impl MoveRecord {
@@ -18,6 +19,7 @@ impl MoveRecord {
         capture: Option<Piece>,
         piece_type: PieceType,
         first_move: bool,
+        promotion: bool,
     ) -> Self {
         Self {
             origin: (x1, y1),
@@ -25,6 +27,7 @@ impl MoveRecord {
             capture,
             piece_type,
             first_move,
+            promotion,
         }
     }
 
@@ -50,5 +53,9 @@ impl MoveRecord {
 
     pub fn first_move(&self) -> bool {
         self.first_move
+    }
+
+    pub fn promotion(&self) -> bool {
+        self.promotion
     }
 }

@@ -168,6 +168,10 @@ impl Board {
         }
         let piece2 = self.space(x2, y2).piece();
 
+        let is_promotion = piece.piece_type() == PieceType::Pawn
+            && ((piece.color() == Color::White && y2 == 7)
+                || (piece.color() == Color::Black && y2 == 0));
+
         // Check and execute en passant here since piece removal from capture is different than normal
         if piece.piece_type() == PieceType::Pawn
             && piece2.is_none()
@@ -199,6 +203,7 @@ impl Board {
                         Some(piece2),
                         piece.piece_type(),
                         !piece.has_moved(),
+                        is_promotion,
                     ));
                     piece.mark_moved();
                     self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
@@ -261,6 +266,7 @@ impl Board {
                             None,
                             piece.piece_type(),
                             !piece.has_moved(),
+                            is_promotion,
                         ));
                         piece.mark_moved();
                         self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
@@ -311,6 +317,7 @@ impl Board {
             piece2,
             piece.piece_type(),
             !piece.has_moved(),
+            is_promotion,
         ));
         piece.mark_moved();
         self.spaces[y2 as usize][x2 as usize].set_piece(Some(piece));
@@ -338,7 +345,9 @@ impl Board {
             (piece.color() == Color::White && y == 7) || (piece.color() == Color::Black && y == 0),
             "promote called on ineligible pawn"
         );
-        self.spaces[y as usize][x as usize].set_piece(Some(Piece::new(piece_type, piece.color())));
+        let mut new_piece = Piece::new(piece_type, piece.color());
+        new_piece.mark_moved();
+        self.spaces[y as usize][x as usize].set_piece(Some(new_piece));
     }
 
     pub fn undo_last_move(&mut self) {
@@ -387,7 +396,13 @@ impl Board {
             rook.unmark_moved(); // can only castle if rook was unmoved, reset this
             self.spaces[y1 as usize][rook_x1].set_piece(Some(rook));
         }
-        self.spaces[y1 as usize][x1 as usize].set_piece(Some(piece));
+        if last_move.promotion() {
+            let mut new_piece = Piece::new(PieceType::Pawn, piece.color());
+            new_piece.mark_moved();
+            self.spaces[y1 as usize][x1 as usize].set_piece(Some(new_piece));
+        } else {
+            self.spaces[y1 as usize][x1 as usize].set_piece(Some(piece));
+        }
         self.toggle_turn();
     }
 
