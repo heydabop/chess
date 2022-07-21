@@ -1108,8 +1108,10 @@ mod tests {
         let wp = Piece::new(PieceType::Pawn, Color::White);
         let bp = Piece::new(PieceType::Pawn, Color::Black);
         let mut b = Board::make_custom(vec![(wp, 0, 7), (bp, 0, 0)], Color::White);
-        let wb = Piece::new(PieceType::Bishop, Color::White);
-        let br = Piece::new(PieceType::Rook, Color::Black);
+        let mut wb = Piece::new(PieceType::Bishop, Color::White);
+        wb.mark_moved();
+        let mut br = Piece::new(PieceType::Rook, Color::Black);
+        br.mark_moved();
         let b2 = Board::make_custom(vec![(wb, 0, 7), (br, 0, 0)], Color::White);
         b.promote_pawn(0, 7, PieceType::Bishop);
         b.promote_pawn(0, 0, PieceType::Rook);
