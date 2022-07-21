@@ -427,9 +427,7 @@ impl Board {
                         let mut new_board = self.clone();
                         for x1 in 0..8 {
                             for y1 in 0..8 {
-                                if x0 != x1
-                                    && y0 != y1
-                                    && new_board.move_piece(x0, y0, x1, y1)
+                                if new_board.move_piece(x0, y0, x1, y1)
                                     && !new_board.is_in_check(color)
                                 {
                                     // color would no longer be in check if this move were made
@@ -924,6 +922,14 @@ mod tests {
     }
 
     #[test]
+    fn king_can_capture_queen() {
+        let wk = Piece::new(PieceType::King, Color::White);
+        let bq = Piece::new(PieceType::Queen, Color::Black);
+        let mut b = Board::make_custom(vec![(wk, 4, 0), (bq, 5, 0)], Color::White);
+        assert!(b.move_piece(4, 0, 5, 0));
+    }
+
+    #[test]
     fn knight_can_move_into_empty() {
         let wn = Piece::new(PieceType::Knight, Color::White);
         let b = Board::make_custom(vec![(wn, 6, 2)], Color::White);
@@ -1170,5 +1176,23 @@ mod tests {
         assert!(!b.is_in_checkmate(Color::Black));
         assert!(b.move_piece(7, 4, 5, 6));
         assert!(b.is_in_checkmate(Color::Black));
+    }
+
+    #[test]
+    fn cornered_king_isnt_checkmate() {
+        // bug found while playing around
+        // king should be able to capture unprotected piece that has cornered it, but is instead marked as in checkmate
+        let mut b = Board::new();
+        assert!(b.move_piece(4, 1, 4, 2));
+        assert!(b.move_piece(0, 6, 0, 5));
+        assert!(b.move_piece(3, 0, 6, 3));
+        assert!(b.move_piece(0, 5, 0, 4));
+        assert!(b.move_piece(6, 3, 6, 6));
+        assert!(b.move_piece(0, 4, 0, 3));
+        assert!(!b.is_in_checkmate(b.turn_color()));
+        assert!(b.move_piece(6, 6, 5, 7));
+        // at this point white queen is in back row and adjacent to black king
+        // black isnt in checkmate but only move is to capture WQ with BK
+        assert!(!b.is_in_checkmate(b.turn_color()));
     }
 }
