@@ -1,4 +1,3 @@
-#![feature(array_from_fn)]
 #![allow(dead_code)]
 #![warn(clippy::pedantic)]
 #![allow(

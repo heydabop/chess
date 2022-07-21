@@ -26,6 +26,7 @@ pub struct Game {
     quitting: bool,
     promoting: Option<(u8, u8)>,
     stdout: Stdout,
+    victor: Option<Color>,
 }
 
 impl Game {
@@ -37,6 +38,7 @@ impl Game {
             quitting: false,
             promoting: None,
             stdout: stdout(),
+            victor: None,
         }
     }
 
@@ -48,6 +50,7 @@ impl Game {
             quitting: false,
             promoting: None,
             stdout: stdout(),
+            victor: None,
         }
     }
 
@@ -70,60 +73,68 @@ impl Game {
             let e = read()?;
             if let Event::Key(k) = e {
                 let pos = cursor::position()?;
+                let can_move = self.promoting.is_none() && self.victor.is_none();
                 match k.code {
                     KeyCode::Up => {
-                        if self.promoting.is_none() && pos.1 > MIN_Y {
+                        if can_move && pos.1 > MIN_Y {
                             execute!(self.stdout, cursor::MoveUp(SPACE_HEIGHT))?;
                         }
                     }
                     KeyCode::Down => {
-                        if self.promoting.is_none() && pos.1 < MAX_Y {
+                        if can_move && pos.1 < MAX_Y {
                             execute!(self.stdout, cursor::MoveDown(SPACE_HEIGHT))?;
                         }
                     }
                     KeyCode::Left => {
-                        if self.promoting.is_none() && pos.0 > MIN_X {
+                        if can_move && pos.0 > MIN_X {
                             execute!(self.stdout, cursor::MoveLeft(SPACE_WIDTH))?;
                         }
                     }
                     KeyCode::Right => {
-                        if self.promoting.is_none() && pos.0 < MAX_X {
+                        if can_move && pos.0 < MAX_X {
                             execute!(self.stdout, cursor::MoveRight(SPACE_WIDTH))?;
                         }
                     }
+                    // promote to bishop
                     KeyCode::Char('b') => {
                         if let Some(promoting) = self.promoting {
                             self.board
                                 .promote_pawn(promoting.0, promoting.1, PieceType::Bishop);
                             self.promoting = None;
+                            self.check_victor();
                             self.queue_board()?;
                             self.queue_status_text()?;
                             queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
                             self.stdout.flush()?;
                         }
                     }
+                    // promote to rook
                     KeyCode::Char('r') => {
                         if let Some(promoting) = self.promoting {
                             self.board
                                 .promote_pawn(promoting.0, promoting.1, PieceType::Rook);
                             self.promoting = None;
+                            self.check_victor();
                             self.queue_board()?;
                             self.queue_status_text()?;
                             queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
                             self.stdout.flush()?;
                         }
                     }
+                    // prompt to undo
                     KeyCode::Char('z' | 'u') => {
                         self.undoing = true;
                         self.quitting = false;
                         self.queue_status_text()?;
                         self.stdout.flush()?;
                     }
+                    // prompt to quit or promote to queen
                     KeyCode::Char('q') => {
                         if let Some(promoting) = self.promoting {
                             self.board
                                 .promote_pawn(promoting.0, promoting.1, PieceType::Queen);
                             self.promoting = None;
+                            self.check_victor();
                             self.queue_board()?;
                             self.queue_status_text()?;
                             queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
@@ -135,10 +146,12 @@ impl Game {
                             self.stdout.flush()?;
                         }
                     }
+                    // confirm quit or undo
                     KeyCode::Char('y') => {
                         if self.undoing {
                             self.selected = None;
                             self.promoting = None;
+                            self.victor = None;
                             self.board.undo_last_move();
                             self.undoing = false;
                             self.queue_board()?;
@@ -151,6 +164,7 @@ impl Game {
                             break;
                         }
                     }
+                    // stop undoing/quitting, or promote to knight
                     KeyCode::Char('n') => {
                         if self.undoing {
                             self.undoing = false;
@@ -164,12 +178,14 @@ impl Game {
                             self.board
                                 .promote_pawn(promoting.0, promoting.1, PieceType::Knight);
                             self.promoting = None;
+                            self.check_victor();
                             self.queue_board()?;
                             self.queue_status_text()?;
                             queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
                             self.stdout.flush()?;
                         }
                     }
+                    // deselect or stop undoing/quitting
                     KeyCode::Esc => {
                         if self.selected.is_some() {
                             self.selected = None;
@@ -188,8 +204,9 @@ impl Game {
                             self.stdout.flush()?;
                         }
                     }
+                    // select or move piece
                     KeyCode::Char(' ') => {
-                        if self.promoting.is_some() {
+                        if !can_move {
                             continue;
                         }
                         self.quitting = false;
@@ -227,6 +244,7 @@ impl Game {
                                     }
                                 };
 
+                                self.check_victor();
                                 self.queue_board()?;
                                 self.queue_captured_pieces()?;
                                 queue!(
@@ -264,6 +282,15 @@ impl Game {
         execute!(self.stdout, cursor::MoveTo(0, 0))?;
 
         Ok(())
+    }
+
+    fn check_victor(&mut self) {
+        if self.board.is_in_checkmate(self.board.turn_color()) {
+            self.victor = Some(match self.board.turn_color() {
+                Color::Black => Color::White,
+                Color::White => Color::Black,
+            });
+        }
     }
 
     fn queue_board(&mut self) -> Result<()> {
@@ -326,6 +353,11 @@ impl Game {
             ("QUIT? (y/n)                ", TermColor::Magenta)
         } else if self.undoing {
             ("UNDO? (y/n)                ", TermColor::Magenta)
+        } else if self.victor.is_some() {
+            match self.victor.unwrap() {
+                Color::White => ("WHITE WINS!                 ", TermColor::Magenta),
+                Color::Black => ("BLACK WINS!                 ", TermColor::Magenta),
+            }
         } else if self.promoting.is_some() {
             ("SELECT PROMOTION: (q/r/b/n)", TermColor::Magenta)
         } else {
