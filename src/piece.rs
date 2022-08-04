@@ -1,6 +1,6 @@
 use crate::color::Color;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Piece {
     color: Color,
     has_moved: bool,

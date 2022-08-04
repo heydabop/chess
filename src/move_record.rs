@@ -1,6 +1,6 @@
 use crate::piece::{Piece, PieceType};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MoveRecord {
     origin: (u8, u8),
     dest: (u8, u8),
@@ -11,6 +11,7 @@ pub struct MoveRecord {
 }
 
 impl MoveRecord {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         x1: u8,
         y1: u8,

@@ -5,7 +5,7 @@ use crate::space::Space;
 use std::array::from_fn;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Board {
     spaces: [[Space; 8]; 8],
     turn_color: Color,
