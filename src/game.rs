@@ -57,6 +57,7 @@ impl Game {
     pub fn run_loop(&mut self) -> Result<()> {
         queue!(self.stdout, terminal::Clear(terminal::ClearType::All))?;
         self.queue_board()?;
+        self.queue_captured_pieces()?;
         queue!(
             self.stdout,
             cursor::MoveLeft(1),
@@ -383,12 +384,25 @@ impl Game {
         let white = self.board.captured_by_white().clone();
         let black = self.board.captured_by_black().clone();
 
+        let x_start = SPACE_WIDTH * 8 + SPACE_WIDTH / 2;
+
         queue!(
             self.stdout,
-            cursor::MoveTo(SPACE_WIDTH * 8 + SPACE_WIDTH / 2, 1),
+            cursor::MoveTo(x_start, 1),
             style::SetForegroundColor(TermColor::Green),
             style::SetBackgroundColor(TermColor::Black),
         )?;
+
+        // blank rows, needed if a single piece was captured and then undone
+        for _ in 0..=5 {
+            queue!(
+                self.stdout,
+                style::Print("                "),
+                cursor::MoveDown(1),
+                cursor::MoveLeft(16)
+            )?;
+        }
+        queue!(self.stdout, cursor::MoveTo(x_start, 1))?;
 
         self.queue_captured_row(&black, PieceType::Queen, false)?;
         self.queue_captured_row(&black, PieceType::Rook, false)?;
@@ -396,11 +410,25 @@ impl Game {
         self.queue_captured_row(&black, PieceType::Knight, false)?;
         self.queue_captured_row(&black, PieceType::Pawn, false)?;
 
+        let x_start = SPACE_WIDTH * 8 + SPACE_WIDTH / 2;
+        let y_start = SPACE_HEIGHT * 8 - 1;
+
         queue!(
             self.stdout,
-            cursor::MoveTo(SPACE_WIDTH * 8 + SPACE_WIDTH / 2, SPACE_HEIGHT * 8 - 1),
+            cursor::MoveTo(x_start, y_start),
             style::SetForegroundColor(TermColor::Red),
         )?;
+
+        // blank rows
+        for _ in 0..=5 {
+            queue!(
+                self.stdout,
+                style::Print("                "),
+                cursor::MoveUp(1),
+                cursor::MoveLeft(16)
+            )?;
+        }
+        queue!(self.stdout, cursor::MoveTo(x_start, y_start))?;
 
         self.queue_captured_row(&white, PieceType::Pawn, true)?;
         self.queue_captured_row(&white, PieceType::Knight, true)?;
