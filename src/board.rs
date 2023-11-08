@@ -669,7 +669,7 @@ impl Board {
             });
         });
         // should this panic or simply return false? need to not panic if there are custom boards
-        let pos = pos.unwrap_or_else(|| panic!("unable to find {:?} king on board", color));
+        let pos = pos.unwrap_or_else(|| panic!("unable to find {color:?} king on board"));
 
         self.is_space_attacked(pos.0, pos.1, color)
     }

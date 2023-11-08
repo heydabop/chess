@@ -7,10 +7,10 @@ use crossterm::{
     event::{read, Event, KeyCode},
     execute, queue,
     style::{self, Color as TermColor, Stylize},
-    terminal, Result,
+    terminal,
 };
 use std::collections::HashMap;
-use std::io::{stdout, Stdout, Write};
+use std::io::{stdout, Result, Stdout, Write};
 
 const SPACE_WIDTH: u16 = 5;
 const SPACE_HEIGHT: u16 = 3;
@@ -61,8 +61,7 @@ impl Game {
         queue!(
             self.stdout,
             cursor::MoveLeft(1),
-            cursor::SetCursorShape(cursor::CursorShape::Block),
-            cursor::EnableBlinking,
+            cursor::SetCursorStyle::BlinkingBlock,
             cursor::Show,
             cursor::MoveTo(SPACE_WIDTH / 2, SPACE_HEIGHT * 7 + SPACE_HEIGHT / 2),
         )?;

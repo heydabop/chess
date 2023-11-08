@@ -9,4 +9,4 @@ edition = "2021"
 lto = true
 
 [dependencies]
-crossterm = "0.24"
+crossterm = "0.27"

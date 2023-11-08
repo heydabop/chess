@@ -13,8 +13,8 @@ mod move_record;
 mod piece;
 mod space;
 
-use crossterm::Result;
 use game::Game;
+use std::io::Result;
 
 fn main() -> Result<()> {
     let mut game = Game::new();
