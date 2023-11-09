@@ -1,7 +1,7 @@
-use crate::board::Board;
 use crate::color::Color;
 use crate::piece::PieceType;
 use crate::space::Space;
+use crate::{board::Board, netplay::NetPlay};
 use crossterm::{
     cursor,
     event::{read, Event, KeyCode},
@@ -11,6 +11,7 @@ use crossterm::{
 };
 use std::collections::HashMap;
 use std::io::{stdout, Result, Stdout, Write};
+use std::net::TcpStream;
 
 const SPACE_WIDTH: u16 = 5;
 const SPACE_HEIGHT: u16 = 3;
@@ -27,6 +28,7 @@ pub struct Game {
     promoting: Option<(u8, u8)>,
     stdout: Stdout,
     victor: Option<Color>,
+    netplay: Option<NetPlay<TcpStream>>,
 }
 
 impl Game {
@@ -39,6 +41,7 @@ impl Game {
             promoting: None,
             stdout: stdout(),
             victor: None,
+            netplay: None,
         }
     }
 
@@ -51,6 +54,20 @@ impl Game {
             promoting: None,
             stdout: stdout(),
             victor: None,
+            netplay: None,
+        }
+    }
+
+    pub fn with_tcp_netplay(netplay: NetPlay<TcpStream>) -> Self {
+        Self {
+            board: Board::new(),
+            selected: None,
+            undoing: false,
+            quitting: false,
+            promoting: None,
+            stdout: stdout(),
+            victor: None,
+            netplay: Some(netplay),
         }
     }
 

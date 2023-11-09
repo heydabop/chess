@@ -48,12 +48,27 @@ impl Piece {
     }
 }
 
+#[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PieceType {
-    King,
+    King = 1,
     Queen,
     Rook,
     Bishop,
     Knight,
     Pawn,
+}
+
+impl From<u8> for PieceType {
+    fn from(i: u8) -> Self {
+        match i {
+            1 => Self::King,
+            2 => Self::Queen,
+            3 => Self::Rook,
+            4 => Self::Bishop,
+            5 => Self::Knight,
+            6 => Self::Pawn,
+            _ => panic!("unrecognized piece type {i}"),
+        }
+    }
 }
