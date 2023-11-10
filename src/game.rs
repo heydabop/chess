@@ -1,7 +1,9 @@
 use crate::color::Color;
+use crate::netplay::Command;
 use crate::piece::PieceType;
 use crate::space::Space;
 use crate::{board::Board, netplay::NetPlay};
+use crossterm::event::KeyEvent;
 use crossterm::{
     cursor,
     event::{read, Event, KeyCode},
@@ -87,211 +89,46 @@ impl Game {
         terminal::enable_raw_mode()?;
 
         loop {
-            let e = read()?;
-            if let Event::Key(k) = e {
-                let pos = cursor::position()?;
-                let can_move = self.promoting.is_none() && self.victor.is_none();
-                match k.code {
-                    KeyCode::Up => {
-                        if can_move && pos.1 > MIN_Y {
-                            execute!(self.stdout, cursor::MoveUp(SPACE_HEIGHT))?;
-                        }
-                    }
-                    KeyCode::Down => {
-                        if can_move && pos.1 < MAX_Y {
-                            execute!(self.stdout, cursor::MoveDown(SPACE_HEIGHT))?;
-                        }
-                    }
-                    KeyCode::Left => {
-                        if can_move && pos.0 > MIN_X {
-                            execute!(self.stdout, cursor::MoveLeft(SPACE_WIDTH))?;
-                        }
-                    }
-                    KeyCode::Right => {
-                        if can_move && pos.0 < MAX_X {
-                            execute!(self.stdout, cursor::MoveRight(SPACE_WIDTH))?;
-                        }
-                    }
-                    // promote to bishop
-                    KeyCode::Char('b') => {
-                        if let Some(promoting) = self.promoting {
-                            self.board
-                                .promote_pawn(promoting.0, promoting.1, PieceType::Bishop);
-                            self.promoting = None;
-                            self.check_victor();
-                            self.queue_board()?;
-                            self.queue_status_text()?;
-                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
-                            self.stdout.flush()?;
-                        }
-                    }
-                    // promote to rook
-                    KeyCode::Char('r') => {
-                        if let Some(promoting) = self.promoting {
-                            self.board
-                                .promote_pawn(promoting.0, promoting.1, PieceType::Rook);
-                            self.promoting = None;
-                            self.check_victor();
-                            self.queue_board()?;
-                            self.queue_status_text()?;
-                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
-                            self.stdout.flush()?;
-                        }
-                    }
-                    // prompt to undo
-                    KeyCode::Char('z' | 'u') => {
-                        self.undoing = true;
-                        self.quitting = false;
-                        self.queue_status_text()?;
-                        self.stdout.flush()?;
-                    }
-                    // prompt to quit or promote to queen
-                    KeyCode::Char('q') => {
-                        if let Some(promoting) = self.promoting {
-                            self.board
-                                .promote_pawn(promoting.0, promoting.1, PieceType::Queen);
-                            self.promoting = None;
-                            self.check_victor();
-                            self.queue_board()?;
-                            self.queue_status_text()?;
-                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
-                            self.stdout.flush()?;
-                        } else {
-                            self.quitting = true;
-                            self.undoing = false;
-                            self.queue_status_text()?;
-                            self.stdout.flush()?;
-                        }
-                    }
-                    // confirm quit or undo
-                    KeyCode::Char('y') => {
-                        if self.undoing {
-                            self.selected = None;
-                            self.promoting = None;
-                            self.victor = None;
-                            self.board.undo_last_move();
-                            self.undoing = false;
-                            self.queue_board()?;
-                            self.queue_captured_pieces()?;
-                            self.queue_status_text()?;
-                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
-                            self.stdout.flush()?;
-                        }
-                        if self.quitting {
+            if let Some(ref mut netplay) = self.netplay {
+                if netplay.is_host() && self.board.turn_color() == Color::White
+                    || !netplay.is_host() && self.board.turn_color() == Color::Black
+                {
+                    let e = read()?;
+                    if let Event::Key(k) = e {
+                        if self.handle_key_event(k)? {
                             break;
                         }
                     }
-                    // stop undoing/quitting, or promote to knight
-                    KeyCode::Char('n') => {
-                        if self.undoing {
-                            self.undoing = false;
-                            self.queue_status_text()?;
-                            self.stdout.flush()?;
-                        } else if self.quitting {
-                            self.quitting = false;
-                            self.queue_status_text()?;
-                            self.stdout.flush()?;
-                        } else if let Some(promoting) = self.promoting {
-                            self.board
-                                .promote_pawn(promoting.0, promoting.1, PieceType::Knight);
-                            self.promoting = None;
-                            self.check_victor();
-                            self.queue_board()?;
-                            self.queue_status_text()?;
-                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
-                            self.stdout.flush()?;
+                } else {
+                    match netplay.recv()? {
+                        Command::Ack => panic!("unexpected ack"),
+                        Command::Move { x0, y0, x1, y1 } => {
+                            assert!(
+                                self.board.move_piece(x0, y0, x1, y1),
+                                "unable to move piece {x0} {y0} {x1} {y1}"
+                            );
+                        }
+                        Command::Promote { x, y, piece } => {
+                            self.board.promote_pawn(x, y, piece);
                         }
                     }
-                    // deselect or stop undoing/quitting
-                    KeyCode::Esc => {
-                        if self.selected.is_some() {
-                            self.selected = None;
-                            self.queue_board()?;
-                            queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
-                            self.stdout.flush()?;
-                        }
-                        if self.quitting {
-                            self.quitting = false;
-                            self.queue_status_text()?;
-                            self.stdout.flush()?;
-                        }
-                        if self.undoing {
-                            self.undoing = false;
-                            self.queue_status_text()?;
-                            self.stdout.flush()?;
-                        }
+                    self.check_victor();
+                    self.queue_board()?;
+                    self.queue_captured_pieces()?;
+                    queue!(
+                        self.stdout,
+                        cursor::MoveTo(SPACE_WIDTH / 2, 7 * SPACE_HEIGHT + (SPACE_HEIGHT / 2))
+                    )?;
+                    self.queue_status_text()?;
+                    self.stdout.flush()?;
+                }
+            } else {
+                let e = read()?;
+                if let Event::Key(k) = e {
+                    if self.handle_key_event(k)? {
+                        break;
                     }
-                    // select or move piece
-                    KeyCode::Char(' ') => {
-                        if !can_move {
-                            continue;
-                        }
-                        self.quitting = false;
-                        self.undoing = false;
-                        if pos.0 > MAX_X || pos.1 > MAX_Y {
-                            continue;
-                        }
-                        #[allow(clippy::cast_possible_truncation)]
-                        let x = (pos.0 / SPACE_WIDTH) as u8;
-                        #[allow(clippy::cast_possible_truncation)]
-                        let y = 7 - (pos.1 / SPACE_HEIGHT) as u8;
-                        if let Some(s) = self.selected {
-                            if s.0 == x && s.1 == y {
-                                let space = self.board.space(x, y);
-                                let colors = get_term_colors(space);
-                                execute!(
-                                    self.stdout,
-                                    style::PrintStyledContent(
-                                        space.draw().with(colors.0).on_black()
-                                    ),
-                                    cursor::MoveLeft(1)
-                                )?;
-                                self.selected = None;
-                            } else if x < 8 && y < 8 && self.board.move_piece(s.0, s.1, x, y) {
-                                self.selected = None;
-                                self.promoting = {
-                                    let piece = self.board.space(x, y).piece().as_ref().unwrap();
-                                    if piece.piece_type() == PieceType::Pawn
-                                        && ((piece.color() == Color::White && y == 7)
-                                            || (piece.color() == Color::Black && y == 0))
-                                    {
-                                        Some((x, y))
-                                    } else {
-                                        None
-                                    }
-                                };
-
-                                self.check_victor();
-                                self.queue_board()?;
-                                self.queue_captured_pieces()?;
-                                queue!(
-                                    self.stdout,
-                                    cursor::MoveTo(
-                                        u16::from(x) * SPACE_WIDTH + (SPACE_WIDTH / 2),
-                                        (7 - u16::from(y)) * SPACE_HEIGHT + (SPACE_HEIGHT / 2)
-                                    )
-                                )?;
-                                self.queue_status_text()?;
-                                self.stdout.flush()?;
-                            }
-                        } else if x < 8 && y < 8 {
-                            let space = self.board.space(x, y);
-                            if let Some(piece_color) = space.piece_color() {
-                                if piece_color == self.board.turn_color() {
-                                    self.selected = Some((x, y));
-                                    self.queue_space(x, y)?;
-                                    queue!(
-                                        self.stdout,
-                                        cursor::MoveUp(MIN_Y),
-                                        cursor::MoveLeft(MIN_X + 1)
-                                    )?;
-                                    self.stdout.flush()?;
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                };
+                }
             }
         }
 
@@ -299,6 +136,258 @@ impl Game {
         execute!(self.stdout, cursor::MoveTo(0, 0))?;
 
         Ok(())
+    }
+
+    // returns true if quitting
+    fn handle_key_event(&mut self, k: KeyEvent) -> Result<bool> {
+        let pos = cursor::position()?;
+        let can_move = if let Some(netplay) = &self.netplay {
+            (netplay.is_host() && self.board.turn_color() == Color::White
+                || !netplay.is_host() && self.board.turn_color() == Color::Black)
+                && self.promoting.is_none()
+                && self.victor.is_none()
+        } else {
+            self.promoting.is_none() && self.victor.is_none()
+        };
+        match k.code {
+            KeyCode::Up => {
+                if can_move && pos.1 > MIN_Y {
+                    execute!(self.stdout, cursor::MoveUp(SPACE_HEIGHT))?;
+                }
+            }
+            KeyCode::Down => {
+                if can_move && pos.1 < MAX_Y {
+                    execute!(self.stdout, cursor::MoveDown(SPACE_HEIGHT))?;
+                }
+            }
+            KeyCode::Left => {
+                if can_move && pos.0 > MIN_X {
+                    execute!(self.stdout, cursor::MoveLeft(SPACE_WIDTH))?;
+                }
+            }
+            KeyCode::Right => {
+                if can_move && pos.0 < MAX_X {
+                    execute!(self.stdout, cursor::MoveRight(SPACE_WIDTH))?;
+                }
+            }
+            // promote to bishop
+            KeyCode::Char('b') => {
+                if let Some(promoting) = self.promoting {
+                    self.board
+                        .promote_pawn(promoting.0, promoting.1, PieceType::Bishop);
+                    if let Some(ref mut netplay) = self.netplay {
+                        netplay.send(Command::Promote {
+                            x: promoting.0,
+                            y: promoting.1,
+                            piece: PieceType::Bishop,
+                        })?;
+                    }
+                    self.promoting = None;
+                    self.check_victor();
+                    self.queue_board()?;
+                    self.queue_status_text()?;
+                    queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                    self.stdout.flush()?;
+                }
+            }
+            // promote to rook
+            KeyCode::Char('r') => {
+                if let Some(promoting) = self.promoting {
+                    self.board
+                        .promote_pawn(promoting.0, promoting.1, PieceType::Rook);
+                    if let Some(ref mut netplay) = self.netplay {
+                        netplay.send(Command::Promote {
+                            x: promoting.0,
+                            y: promoting.1,
+                            piece: PieceType::Pawn,
+                        })?;
+                    }
+                    self.promoting = None;
+                    self.check_victor();
+                    self.queue_board()?;
+                    self.queue_status_text()?;
+                    queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                    self.stdout.flush()?;
+                }
+            }
+            // prompt to undo
+            KeyCode::Char('z' | 'u') => {
+                if self.netplay.is_none() {
+                    self.undoing = true;
+                    self.quitting = false;
+                    self.queue_status_text()?;
+                    self.stdout.flush()?;
+                }
+            }
+            // prompt to quit or promote to queen
+            KeyCode::Char('q') => {
+                if let Some(promoting) = self.promoting {
+                    self.board
+                        .promote_pawn(promoting.0, promoting.1, PieceType::Queen);
+                    if let Some(ref mut netplay) = self.netplay {
+                        netplay.send(Command::Promote {
+                            x: promoting.0,
+                            y: promoting.1,
+                            piece: PieceType::Queen,
+                        })?;
+                    }
+                    self.promoting = None;
+                    self.check_victor();
+                    self.queue_board()?;
+                    self.queue_status_text()?;
+                    queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                    self.stdout.flush()?;
+                } else {
+                    self.quitting = true;
+                    self.undoing = false;
+                    self.queue_status_text()?;
+                    self.stdout.flush()?;
+                }
+            }
+            // confirm quit or undo
+            KeyCode::Char('y') => {
+                if self.undoing {
+                    self.selected = None;
+                    self.promoting = None;
+                    self.victor = None;
+                    self.board.undo_last_move();
+                    self.undoing = false;
+                    self.queue_board()?;
+                    self.queue_captured_pieces()?;
+                    self.queue_status_text()?;
+                    queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                    self.stdout.flush()?;
+                }
+                if self.quitting {
+                    return Ok(true);
+                }
+            }
+            // stop undoing/quitting, or promote to knight
+            KeyCode::Char('n') => {
+                if self.undoing {
+                    self.undoing = false;
+                    self.queue_status_text()?;
+                    self.stdout.flush()?;
+                } else if self.quitting {
+                    self.quitting = false;
+                    self.queue_status_text()?;
+                    self.stdout.flush()?;
+                } else if let Some(promoting) = self.promoting {
+                    self.board
+                        .promote_pawn(promoting.0, promoting.1, PieceType::Knight);
+                    if let Some(ref mut netplay) = self.netplay {
+                        netplay.send(Command::Promote {
+                            x: promoting.0,
+                            y: promoting.1,
+                            piece: PieceType::Knight,
+                        })?;
+                    }
+                    self.promoting = None;
+                    self.check_victor();
+                    self.queue_board()?;
+                    self.queue_status_text()?;
+                    queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                    self.stdout.flush()?;
+                }
+            }
+            // deselect or stop undoing/quitting
+            KeyCode::Esc => {
+                if self.selected.is_some() {
+                    self.selected = None;
+                    self.queue_board()?;
+                    queue!(self.stdout, cursor::MoveTo(pos.0, pos.1))?;
+                    self.stdout.flush()?;
+                }
+                if self.quitting {
+                    self.quitting = false;
+                    self.queue_status_text()?;
+                    self.stdout.flush()?;
+                }
+                if self.undoing {
+                    self.undoing = false;
+                    self.queue_status_text()?;
+                    self.stdout.flush()?;
+                }
+            }
+            // select or move piece
+            KeyCode::Char(' ') => {
+                if !can_move {
+                    return Ok(false);
+                }
+                self.quitting = false;
+                self.undoing = false;
+                if pos.0 > MAX_X || pos.1 > MAX_Y {
+                    return Ok(false);
+                }
+                #[allow(clippy::cast_possible_truncation)]
+                let x = (pos.0 / SPACE_WIDTH) as u8;
+                #[allow(clippy::cast_possible_truncation)]
+                let y = 7 - (pos.1 / SPACE_HEIGHT) as u8;
+                if let Some(s) = self.selected {
+                    if s.0 == x && s.1 == y {
+                        let space = self.board.space(x, y);
+                        let colors = get_term_colors(space);
+                        execute!(
+                            self.stdout,
+                            style::PrintStyledContent(space.draw().with(colors.0).on_black()),
+                            cursor::MoveLeft(1)
+                        )?;
+                        self.selected = None;
+                    } else if x < 8 && y < 8 && self.board.move_piece(s.0, s.1, x, y) {
+                        if let Some(ref mut netplay) = self.netplay {
+                            netplay.send(Command::Move {
+                                x0: s.0,
+                                y0: s.1,
+                                x1: x,
+                                y1: y,
+                            })?;
+                        }
+                        self.selected = None;
+                        self.promoting = {
+                            let piece = self.board.space(x, y).piece().as_ref().unwrap();
+                            if piece.piece_type() == PieceType::Pawn
+                                && ((piece.color() == Color::White && y == 7)
+                                    || (piece.color() == Color::Black && y == 0))
+                            {
+                                Some((x, y))
+                            } else {
+                                None
+                            }
+                        };
+
+                        self.check_victor();
+                        self.queue_board()?;
+                        self.queue_captured_pieces()?;
+                        queue!(
+                            self.stdout,
+                            cursor::MoveTo(
+                                u16::from(x) * SPACE_WIDTH + (SPACE_WIDTH / 2),
+                                (7 - u16::from(y)) * SPACE_HEIGHT + (SPACE_HEIGHT / 2)
+                            )
+                        )?;
+                        self.queue_status_text()?;
+                        self.stdout.flush()?;
+                    }
+                } else if x < 8 && y < 8 {
+                    let space = self.board.space(x, y);
+                    if let Some(piece_color) = space.piece_color() {
+                        if piece_color == self.board.turn_color() {
+                            self.selected = Some((x, y));
+                            self.queue_space(x, y)?;
+                            queue!(
+                                self.stdout,
+                                cursor::MoveUp(MIN_Y),
+                                cursor::MoveLeft(MIN_X + 1)
+                            )?;
+                            self.stdout.flush()?;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        Ok(false)
     }
 
     fn check_victor(&mut self) {

@@ -42,14 +42,14 @@ impl<S: Read + Write> NetPlay<S> {
         self.is_host
     }
 
-    pub fn send(&mut self, command: Command) -> Result<()> {
+    fn send_command(&mut self, command: Command) -> Result<()> {
         let packet = command.to_packet();
         self.stream.write_all(&packet)?;
         self.stream.flush()?;
         Ok(())
     }
 
-    pub fn recv(&mut self) -> Result<Command> {
+    fn recv_command(&mut self) -> Result<Command> {
         let mut type_buf = [0];
         self.stream.read_exact(&mut type_buf)?;
         let packet_type = type_buf[0];
@@ -78,6 +78,21 @@ impl<S: Read + Write> NetPlay<S> {
             _ => unreachable!(),
         };
 
+        Ok(command)
+    }
+
+    pub fn send(&mut self, command: Command) -> Result<()> {
+        self.send_command(command)?;
+        let response = self.recv_command()?;
+        if let Command::Ack = response {
+            return Ok(());
+        }
+        panic!("expected ack, got {response:?}");
+    }
+
+    pub fn recv(&mut self) -> Result<Command> {
+        let command = self.recv_command()?;
+        self.send_command(Command::Ack)?;
         Ok(command)
     }
 }
@@ -153,8 +168,8 @@ mod tests {
     #[test]
     fn ack() -> Result<()> {
         let mut netplay = NetPlay::new(false, VecDeque::new());
-        netplay.send(Command::Ack)?;
-        assert_eq!(netplay.recv()?, Command::Ack);
+        netplay.send_command(Command::Ack)?;
+        assert_eq!(netplay.recv_command()?, Command::Ack);
         Ok(())
     }
 
@@ -167,8 +182,8 @@ mod tests {
             x1: 2,
             y1: 3,
         };
-        netplay.send(move_command)?;
-        assert_eq!(netplay.recv()?, move_command);
+        netplay.send_command(move_command)?;
+        assert_eq!(netplay.recv_command()?, move_command);
         Ok(())
     }
 
@@ -180,8 +195,8 @@ mod tests {
             y: 7,
             piece: PieceType::Queen,
         };
-        netplay.send(promote)?;
-        assert_eq!(netplay.recv()?, promote);
+        netplay.send_command(promote)?;
+        assert_eq!(netplay.recv_command()?, promote);
         Ok(())
     }
 
@@ -205,12 +220,12 @@ mod tests {
             x1: 6,
             y1: 7,
         };
-        netplay.send(move1)?;
-        netplay.send(promote)?;
-        netplay.send(move2)?;
-        assert_eq!(netplay.recv()?, move1);
-        assert_eq!(netplay.recv()?, promote);
-        assert_eq!(netplay.recv()?, move2);
+        netplay.send_command(move1)?;
+        netplay.send_command(promote)?;
+        netplay.send_command(move2)?;
+        assert_eq!(netplay.recv_command()?, move1);
+        assert_eq!(netplay.recv_command()?, promote);
+        assert_eq!(netplay.recv_command()?, move2);
         Ok(())
     }
 }
