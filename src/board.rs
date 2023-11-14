@@ -214,6 +214,9 @@ impl Board {
                         self.undo_last_move();
                         return false;
                     }
+                    if is_promotion {
+                        self.toggle_turn(); // set the turn back to the moving player during their promotion
+                    }
                     return true;
                 }
             }
@@ -285,6 +288,9 @@ impl Board {
                             self.undo_last_move();
                             return false;
                         }
+                        if is_promotion {
+                            self.toggle_turn(); // set the turn back to the moving player during their promotion
+                        }
                         return true;
                     }
                 }
@@ -328,6 +334,9 @@ impl Board {
             self.undo_last_move();
             return false;
         }
+        if is_promotion {
+            self.toggle_turn(); // set the turn back to the moving player during their promotion
+        }
 
         true
     }
@@ -348,6 +357,7 @@ impl Board {
         let mut new_piece = Piece::new(piece_type, piece.color());
         new_piece.mark_moved();
         self.spaces[y as usize][x as usize].set_piece(Some(new_piece));
+        self.toggle_turn();
     }
 
     pub fn undo_last_move(&mut self) {

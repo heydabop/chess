@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::io::{stdout, Result, Stdout, Write};
 use std::net::TcpStream;
 
-
 const SPACE_WIDTH: u16 = 5;
 const SPACE_HEIGHT: u16 = 3;
 const MIN_X: u16 = SPACE_WIDTH / 2;
