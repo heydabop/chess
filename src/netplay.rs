@@ -146,6 +146,7 @@ impl NetPlay<TcpStream> {
         };
         let socket = SocketAddrV4::new(address, port);
         let stream = TcpStream::connect(socket)?;
+        stream.set_nodelay(true)?;
         Ok(Some(Self::new(false, stream)))
     }
 }
