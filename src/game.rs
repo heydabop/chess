@@ -88,6 +88,15 @@ impl Game {
         self.stdout.flush()?;
         terminal::enable_raw_mode()?;
 
+        let res = self.run_inner_loop();
+
+        terminal::disable_raw_mode()?;
+        execute!(self.stdout, cursor::MoveTo(0, 0))?;
+
+        res
+    }
+
+    pub fn run_inner_loop(&mut self) -> Result<()> {
         loop {
             if let Some(ref mut netplay) = self.netplay {
                 if netplay.is_host() && self.board.turn_color() == Color::White
@@ -96,7 +105,7 @@ impl Game {
                     let e = read()?;
                     if let Event::Key(k) = e {
                         if self.handle_key_event(k)? {
-                            break;
+                            return Ok(());
                         }
                     }
                 } else {
@@ -126,16 +135,11 @@ impl Game {
                 let e = read()?;
                 if let Event::Key(k) = e {
                     if self.handle_key_event(k)? {
-                        break;
+                        return Ok(());
                     }
                 }
             }
         }
-
-        terminal::disable_raw_mode()?;
-        execute!(self.stdout, cursor::MoveTo(0, 0))?;
-
-        Ok(())
     }
 
     // returns true if quitting
