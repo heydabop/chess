@@ -8,6 +8,7 @@ pub enum Command {
     Ack,
     Move { x0: u8, y0: u8, x1: u8, y1: u8 },
     Promote { x: u8, y: u8, piece: PieceType },
+    Quit,
 }
 
 impl Command {
@@ -16,12 +17,13 @@ impl Command {
             Self::Ack => vec![1],
             Self::Move { x0, y0, x1, y1 } => vec![2, x0, y0, x1, y1],
             Self::Promote { x, y, piece } => vec![3, x, y, piece as u8],
+            Self::Quit => vec![4],
         }
     }
 
     fn packet_length(self) -> u8 {
         match self {
-            Self::Ack => 1,
+            Self::Ack | Self::Quit => 1,
             Self::Move { .. } => 5,
             Self::Promote { .. } => 4,
         }
@@ -53,12 +55,11 @@ impl<S: Read + Write> NetPlay<S> {
         let mut type_buf = [0];
         self.stream.read_exact(&mut type_buf)?;
         let packet_type = type_buf[0];
-        if packet_type == 1 {
-            return Ok(Command::Ack);
-        }
         let remaining_length = match packet_type {
+            1 => return Ok(Command::Ack),
             2 => 4,
             3 => 3,
+            4 => return Ok(Command::Quit),
             _ => panic!("unrecognized packet type {packet_type}"),
         };
         let mut buf = vec![0; remaining_length];

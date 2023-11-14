@@ -120,6 +120,9 @@ impl Game {
                         Command::Promote { x, y, piece } => {
                             self.board.promote_pawn(x, y, piece);
                         }
+                        Command::Quit => {
+                            return Ok(());
+                        }
                     }
                     self.check_victor();
                     self.queue_board()?;
@@ -263,6 +266,9 @@ impl Game {
                     self.stdout.flush()?;
                 }
                 if self.quitting {
+                    if let Some(ref mut netplay) = self.netplay {
+                        netplay.send(Command::Quit)?;
+                    }
                     return Ok(true);
                 }
             }
