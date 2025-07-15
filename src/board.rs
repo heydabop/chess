@@ -100,7 +100,6 @@ impl Board {
                 } else {
                     Color::White
                 };
-                #[allow(clippy::match_on_vec_items)]
                 let piece = match chars[col] {
                     '_' => None,
                     'K' => Some(Piece::new(PieceType::King, Color::White)),
