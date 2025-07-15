@@ -4,14 +4,14 @@ use crate::color::Color;
 pub struct Piece {
     color: Color,
     has_moved: bool,
-    piece_type: PieceType,
+    r#type: PieceType,
 }
 
 impl Piece {
     pub fn new(piece_type: PieceType, color: Color) -> Self {
         Self {
             color,
-            piece_type,
+            r#type: piece_type,
             has_moved: false,
         }
     }
@@ -21,7 +21,7 @@ impl Piece {
     }
 
     pub fn draw(&self) -> char {
-        match self.piece_type {
+        match self.r#type {
             PieceType::Pawn => 'P',
             PieceType::Knight => 'N',
             PieceType::Queen => 'Q',
@@ -44,7 +44,7 @@ impl Piece {
     }
 
     pub fn piece_type(&self) -> PieceType {
-        self.piece_type
+        self.r#type
     }
 }
 

@@ -458,7 +458,7 @@ impl Board {
     }
 
     fn pawn_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
-        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        let piece = self.space(x1, y1).piece().unwrap();
         assert!(
             !(piece.piece_type() != PieceType::Pawn),
             "pawn_can_move called on {:?}",
@@ -494,14 +494,14 @@ impl Board {
     }
 
     fn rook_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
-        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        let piece = self.space(x1, y1).piece().unwrap();
         assert!(
             !(piece.piece_type() != PieceType::Rook && piece.piece_type() != PieceType::Queen),
             "rook_can_move called on {:?}",
             piece.piece_type()
         );
         // If there is a piece at the destination and its the same color
-        if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+        if self.space(x2, y2).piece().map(Piece::color) == Some(piece.color()) {
             return false;
         }
         // If the move isn't along a single rank or file
@@ -543,14 +543,14 @@ impl Board {
     }
 
     fn bishop_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
-        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        let piece = self.space(x1, y1).piece().unwrap();
         assert!(
             !(piece.piece_type() != PieceType::Bishop && piece.piece_type() != PieceType::Queen),
             "bishop_can_move called on {:?}",
             piece.piece_type()
         );
         // If there is a piece at the destination and its the same color
-        if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+        if self.space(x2, y2).piece().map(Piece::color) == Some(piece.color()) {
             return false;
         }
         // If the move isn't diagonal
@@ -593,14 +593,14 @@ impl Board {
     }
 
     fn king_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
-        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        let piece = self.space(x1, y1).piece().unwrap();
         assert!(
             !(piece.piece_type() != PieceType::King),
             "king_can_move called on {:?}",
             piece.piece_type()
         );
         // If there is a piece at the destination and its the same color
-        if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+        if self.space(x2, y2).piece().map(Piece::color) == Some(piece.color()) {
             return false;
         }
         let x_abs = (i16::from(x1) - i16::from(x2)).abs();
@@ -615,14 +615,14 @@ impl Board {
     }
 
     fn knight_can_move(&self, x1: u8, y1: u8, x2: u8, y2: u8) -> bool {
-        let piece = self.space(x1, y1).piece().as_ref().unwrap();
+        let piece = self.space(x1, y1).piece().unwrap();
         assert!(
             !(piece.piece_type() != PieceType::Knight),
             "knight_can_move called on {:?}",
             piece.piece_type()
         );
         // If there is a piece at the destination and its the same color
-        if self.space(x2, y2).piece().as_ref().map(Piece::color) == Some(piece.color()) {
+        if self.space(x2, y2).piece().map(Piece::color) == Some(piece.color()) {
             return false;
         }
         let x_abs = (i16::from(x1) - i16::from(x2)).abs();
@@ -658,7 +658,7 @@ impl Board {
     fn is_in_check(&self, color: Color) -> bool {
         //find king
         let pos = self.spaces.iter().enumerate().find_map(|(y, row)| {
-            return row.iter().enumerate().find_map(|(x, space)| {
+            row.iter().enumerate().find_map(|(x, space)| {
                 if let Some(piece) = space.piece() {
                     if piece.piece_type() == PieceType::King && piece.color() == color {
                         #[allow(clippy::cast_possible_truncation)]
@@ -666,7 +666,7 @@ impl Board {
                     }
                 }
                 None
-            });
+            })
         });
         // should this panic or simply return false? need to not panic if there are custom boards
         let pos = pos.unwrap_or_else(|| panic!("unable to find {color:?} king on board"));

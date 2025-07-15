@@ -20,8 +20,8 @@ impl Space {
         }
     }
 
-    pub fn piece(&self) -> &Option<Piece> {
-        &self.piece
+    pub fn piece(&self) -> Option<&Piece> {
+        self.piece.as_ref()
     }
 
     pub fn piece_color(&self) -> Option<Color> {

@@ -4,13 +4,13 @@ use crate::piece::PieceType;
 use crate::space::Space;
 use crossterm::{
     cursor,
-    event::{read, Event, KeyCode},
+    event::{Event, KeyCode, read},
     execute, queue,
     style::{self, Color as TermColor, Stylize},
     terminal,
 };
 use std::collections::HashMap;
-use std::io::{stdout, Result, Stdout, Write};
+use std::io::{Result, Stdout, Write, stdout};
 
 const SPACE_WIDTH: u16 = 5;
 const SPACE_HEIGHT: u16 = 3;
@@ -233,7 +233,7 @@ impl Game {
                             } else if x < 8 && y < 8 && self.board.move_piece(s.0, s.1, x, y) {
                                 self.selected = None;
                                 self.promoting = {
-                                    let piece = self.board.space(x, y).piece().as_ref().unwrap();
+                                    let piece = self.board.space(x, y).piece().unwrap();
                                     if piece.piece_type() == PieceType::Pawn
                                         && ((piece.color() == Color::White && y == 7)
                                             || (piece.color() == Color::Black && y == 0))
@@ -274,7 +274,7 @@ impl Game {
                         }
                     }
                     _ => {}
-                };
+                }
             }
         }
 
